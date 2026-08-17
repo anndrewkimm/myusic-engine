@@ -14,10 +14,16 @@ is required to build or test the foundation.
 
 ## Current milestone
 
-Phase 0 establishes the local project, privacy boundary, normalized schemas, and testable
-interfaces described in the [project brief](docs/project-brief.md). Later phases will add
-history ingestion, identity resolution, lawful audio analysis, clustering, and ranking in
-that order.
+The data-independent foundation from the [project brief](docs/project-brief.md) is now usable:
+
+- privacy-safe Spotify history ingestion from JSON, directories, or ZIP archives;
+- deterministic track behavior aggregation and versioned affinity scoring;
+- strict, source-tagged records for numeric, text, and vector audio features;
+- exact cosine retrieval with weighted multi-seed queries and provenance-aware filters.
+
+The pending export is not needed for the test suite. Real-data validation, catalog identity
+matching, licensed-audio feature extraction, clustering experiments, and trained preference
+ranking remain intentionally unstarted until their required inputs and coverage are available.
 
 ## Development setup
 
@@ -72,6 +78,9 @@ docs/             Project brief and architecture decisions
 src/              Installable `myusic_engine` Python package
 tests/            Unit tests and clearly synthetic fixtures
 ```
+
+The scoring assumptions are documented in [behavioral affinity v1](docs/behavior-affinity.md),
+and the retrieval contract is documented in [weighted multi-seed similarity](docs/similarity.md).
 
 ## Project boundaries
 
