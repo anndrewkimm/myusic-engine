@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/normalized-listening-event-v1.json",
+  "title": "Normalized listening event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "played_at",
+    "media_type",
+    "ms_played",
+    "source_file",
+    "source_record_index"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "played_at": { "type": "string", "format": "date-time" },
+    "media_type": { "enum": ["track", "episode", "unknown"] },
+    "ms_played": { "type": "integer", "minimum": 0 },
+    "track_uri": { "type": ["string", "null"] },
+    "track_name": { "type": ["string", "null"] },
+    "artist_name": { "type": ["string", "null"] },
+    "album_name": { "type": ["string", "null"] },
+    "episode_uri": { "type": ["string", "null"] },
+    "episode_name": { "type": ["string", "null"] },
+    "show_name": { "type": ["string", "null"] },
+    "reason_start": { "type": ["string", "null"] },
+    "reason_end": { "type": ["string", "null"] },
+    "shuffle": { "type": ["boolean", "null"] },
+    "skipped": { "type": ["boolean", "null"] },
+    "offline": { "type": ["boolean", "null"] },
+    "incognito_mode": { "type": ["boolean", "null"] },
+    "platform_family": { "type": ["string", "null"] },
+    "source_file": { "type": "string" },
+    "source_record_index": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

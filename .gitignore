@@ -1,0 +1,51 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Personal Spotify exports and private pipeline data
+data/private/
+data/raw/
+data/interim/
+data/processed/
+Spotify Extended Streaming History/
+Streaming_History_Audio_*.json
+endsong*.json
+my_spotify_data*.zip
+
+# Audio assets must remain local unless an explicit synthetic fixture is approved
+*.aac
+*.aiff
+*.alac
+*.flac
+*.m4a
+*.mp3
+*.ogg
+*.opus
+*.wav
+*.wma
+
+# Local notebooks and model artifacts
+.ipynb_checkpoints/
+mlruns/
+artifacts/

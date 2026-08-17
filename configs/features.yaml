@@ -1,0 +1,35 @@
+schema_version: 1
+feature_set: objective_audio_v1
+
+provenance:
+  required_fields:
+    - feature_source
+    - source_version
+    - coverage_seconds
+    - feature_confidence
+
+audio:
+  mono: true
+  target_sample_rate_hz: 44100
+  minimum_coverage_seconds: 20.0
+
+features:
+  tempo_bpm_estimate_v1:
+    unit: beats_per_minute
+    range: [20.0, 300.0]
+  key_strength_v1:
+    unit: ratio
+    range: [0.0, 1.0]
+  integrated_loudness_lufs_v1:
+    unit: LUFS
+  bass_energy_ratio_150hz_v1:
+    unit: ratio
+    range: [0.0, 1.0]
+  bass_energy_ratio_250hz_v1:
+    unit: ratio
+    range: [0.0, 1.0]
+  spectral_centroid_hz_v1:
+    unit: hertz
+  chroma_mean_v1:
+    unit: normalized_vector
+    dimensions: 12

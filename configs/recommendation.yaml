@@ -1,0 +1,20 @@
+schema_version: 1
+
+affinity:
+  play_count_log_weight: 1.0
+  completion_rate_weight: 1.5
+  intentional_start_rate_weight: 1.0
+  recency_score_weight: 0.5
+  early_skip_rate_weight: -2.0
+  early_skip_threshold_ms: 30000
+  recency_half_life_days: 180
+
+ranking:
+  audio_similarity_weight: 0.50
+  predicted_preference_weight: 0.35
+  novelty_bonus_weight: 0.15
+  artist_repetition_penalty: 0.10
+
+retrieval:
+  metric: cosine
+  minimum_feature_confidence: 0.50

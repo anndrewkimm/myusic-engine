@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/spotify-history-v1.json",
+  "title": "Spotify Extended Streaming History file",
+  "description": "A raw export file. Sensitive fields may be present only at this boundary.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/event" },
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "event": {
+      "type": "object",
+      "required": ["ts", "ms_played"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "platform": { "$ref": "#/$defs/nullableString" },
+        "ms_played": { "type": "integer", "minimum": 0 },
+        "conn_country": { "$ref": "#/$defs/nullableString" },
+        "ip_addr": {
+          "$ref": "#/$defs/nullableString",
+          "x-privacy": "sensitive"
+        },
+        "username": {
+          "$ref": "#/$defs/nullableString",
+          "x-privacy": "sensitive"
+        },
+        "user_agent": {
+          "$ref": "#/$defs/nullableString",
+          "x-privacy": "sensitive"
+        },
+        "master_metadata_track_name": { "$ref": "#/$defs/nullableString" },
+        "master_metadata_album_artist_name": { "$ref": "#/$defs/nullableString" },
+        "master_metadata_album_album_name": { "$ref": "#/$defs/nullableString" },
+        "spotify_track_uri": { "$ref": "#/$defs/nullableString" },
+        "episode_name": { "$ref": "#/$defs/nullableString" },
+        "episode_show_name": { "$ref": "#/$defs/nullableString" },
+        "spotify_episode_uri": { "$ref": "#/$defs/nullableString" },
+        "reason_start": { "$ref": "#/$defs/nullableString" },
+        "reason_end": { "$ref": "#/$defs/nullableString" },
+        "shuffle": { "$ref": "#/$defs/nullableBoolean" },
+        "skipped": { "$ref": "#/$defs/nullableBoolean" },
+        "offline": { "$ref": "#/$defs/nullableBoolean" },
+        "offline_timestamp": { "type": ["integer", "null"], "minimum": 0 },
+        "incognito_mode": { "$ref": "#/$defs/nullableBoolean" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

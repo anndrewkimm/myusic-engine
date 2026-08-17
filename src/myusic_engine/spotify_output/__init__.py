@@ -1,0 +1,1 @@
+"""Supported Spotify output operations."""
