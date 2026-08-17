@@ -1,6 +1,7 @@
 schema_version: 1
 
 affinity:
+  scoring_version: behavior_affinity_v1
   play_count_log_weight: 1.0
   completion_rate_weight: 1.5
   intentional_start_rate_weight: 1.0
@@ -8,6 +9,24 @@ affinity:
   early_skip_rate_weight: -2.0
   early_skip_threshold_ms: 30000
   recency_half_life_days: 180
+  completion_threshold: 0.90
+  session_gap_minutes: 30
+  complete_end_reasons:
+    - endplay
+    - trackdone
+  skip_end_reasons:
+    - backbtn
+    - fwdbtn
+  intentional_start_reasons:
+    - backbtn
+    - clickrow
+    - fwdbtn
+    - playbtn
+    - remote
+  passive_start_reasons:
+    - appload
+    - autoplay
+    - trackdone
 
 ranking:
   audio_similarity_weight: 0.50

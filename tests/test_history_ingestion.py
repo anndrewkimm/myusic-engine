@@ -100,4 +100,7 @@ def test_cli_prepares_history(tmp_path: Path, capsys: pytest.CaptureFixture[str]
 
     assert exit_code == 0
     assert (output_directory / "listening_events.jsonl").exists()
-    assert "Prepared 3 events" in capsys.readouterr().out
+    assert (output_directory / "user_track_affinity.jsonl").exists()
+    output = capsys.readouterr().out
+    assert "Prepared 3 events" in output
+    assert "Aggregated 2 track affinity records" in output

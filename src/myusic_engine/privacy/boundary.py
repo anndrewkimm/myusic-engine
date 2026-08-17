@@ -42,4 +42,6 @@ def assert_privacy_safe(value: object) -> None:
     sensitive_fields = find_sensitive_fields(value)
     if sensitive_fields:
         field_list = ", ".join(sorted(sensitive_fields))
-        raise PrivacyBoundaryError(f"Sensitive field names crossed the privacy boundary: {field_list}")
+        raise PrivacyBoundaryError(
+            f"Sensitive field names crossed the privacy boundary: {field_list}"
+        )

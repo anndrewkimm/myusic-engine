@@ -46,7 +46,9 @@ def test_sensitive_values_do_not_affect_deduplication_identity() -> None:
     )
 
     first_event = normalize_history_record(first, source_file="first.json", source_record_index=0)
-    second_event = normalize_history_record(second, source_file="second.json", source_record_index=99)
+    second_event = normalize_history_record(
+        second, source_file="second.json", source_record_index=99
+    )
 
     assert first_event.event_id == second_event.event_id
 

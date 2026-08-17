@@ -43,18 +43,24 @@ original export ZIP.
 ```powershell
 python -m myusic_engine prepare-history `
   "data/private/spotify-export.zip" `
-  --output-dir "data/processed/history"
+  --output-dir "data/processed/history" `
+  --recommendation-config "configs/recommendation.yaml"
 ```
 
-The command writes two ignored local files:
+The command writes three ignored local files:
 
 - `listening_events.jsonl`: normalized, deduplicated events with tracks, episodes, and unknown
   media explicitly labeled;
 - `ingestion_report.json`: record counts, safe validation issues, and counts of sensitive raw
   fields removed (never their values).
+- `user_track_affinity.jsonl`: track-level play, completion, skip, repeat, recency, signal
+  coverage, and explainable heuristic-score fields.
 
 Use `--strict` to stop on the first invalid record. Without it, malformed records are excluded
 and summarized in the report so one unusual row does not discard an otherwise usable export.
+Duration-based completion remains null until catalog metadata is available. A local JSON object
+mapping track URIs to positive duration milliseconds can be supplied with `--duration-map`;
+reason-based completion remains separately coverage-scored when duration is unavailable.
 
 ## Repository layout
 

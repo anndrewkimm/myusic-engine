@@ -5,9 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import os
 import re
-import tempfile
 from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import datetime, timezone
@@ -22,6 +20,7 @@ from myusic_engine.ingest.models import (
     MediaType,
     NormalizedListeningEvent,
 )
+from myusic_engine.io import atomic_write_text
 from myusic_engine.privacy import assert_privacy_safe, find_sensitive_fields
 
 
@@ -340,7 +339,9 @@ def load_history(source: str | Path, *, strict: bool = False) -> IngestionResult
                 continue
             events_by_id[event.event_id] = event
 
-    events = tuple(sorted(events_by_id.values(), key=lambda event: (event.played_at, event.event_id)))
+    events = tuple(
+        sorted(events_by_id.values(), key=lambda event: (event.played_at, event.event_id))
+    )
     media_counts = Counter(event.media_type for event in events)
     report = IngestionReport(
         source_files=tuple(source_files),
@@ -356,24 +357,9 @@ def load_history(source: str | Path, *, strict: bool = False) -> IngestionResult
     return IngestionResult(events=events, report=report)
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=path.parent,
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        text=True,
-    )
-    os.close(descriptor)
-    temporary_path = Path(temporary_name)
-    try:
-        temporary_path.write_text(content, encoding="utf-8", newline="\n")
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
-
-
-def write_ingestion_result(result: IngestionResult, output_directory: str | Path) -> tuple[Path, Path]:
+def write_ingestion_result(
+    result: IngestionResult, output_directory: str | Path
+) -> tuple[Path, Path]:
     """Atomically write normalized JSON Lines and a non-sensitive quality report."""
 
     output_path = Path(output_directory)
@@ -392,8 +378,8 @@ def write_ingestion_result(result: IngestionResult, output_directory: str | Path
     assert_privacy_safe(report_record)
     report_content = json.dumps(report_record, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
-    _atomic_write_text(events_path, events_content)
-    _atomic_write_text(report_path, report_content)
+    atomic_write_text(events_path, events_content)
+    atomic_write_text(report_path, report_content)
     return events_path, report_path
 
 

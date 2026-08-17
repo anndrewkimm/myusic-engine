@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "Andrew" }]
-dependencies = []
+dependencies = ["PyYAML>=6.0,<7"]
 
 [project.scripts]
 myusic-engine = "myusic_engine.cli:main"
@@ -21,6 +21,7 @@ dev = [
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
+  "types-PyYAML>=6.0,<7",
 ]
 
 [tool.setuptools.packages.find]
