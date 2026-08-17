@@ -34,6 +34,28 @@ The initial ingestion code intentionally uses the Python standard library. Heavi
 machine-learning dependencies will be added as optional groups only when their corresponding
 pipeline stages are implemented.
 
+## When the Spotify export arrives
+
+Keep the original JSON files or ZIP under `data/private/`, then run the local privacy-cleaning
+step. The command accepts one JSON history file, a directory containing history files, or the
+original export ZIP.
+
+```powershell
+python -m myusic_engine prepare-history `
+  "data/private/spotify-export.zip" `
+  --output-dir "data/processed/history"
+```
+
+The command writes two ignored local files:
+
+- `listening_events.jsonl`: normalized, deduplicated events with tracks, episodes, and unknown
+  media explicitly labeled;
+- `ingestion_report.json`: record counts, safe validation issues, and counts of sensitive raw
+  fields removed (never their values).
+
+Use `--strict` to stop on the first invalid record. Without it, malformed records are excluded
+and summarized in the report so one unusual row does not discard an otherwise usable export.
+
 ## Repository layout
 
 ```text

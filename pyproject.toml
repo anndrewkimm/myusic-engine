@@ -12,6 +12,9 @@ license = { text = "Proprietary" }
 authors = [{ name = "Andrew" }]
 dependencies = []
 
+[project.scripts]
+myusic-engine = "myusic_engine.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "mypy>=1.14,<2",
