@@ -51,6 +51,59 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional JSON object mapping track URIs to duration milliseconds",
     )
+
+    audio_parser = subparsers.add_parser(
+        "analyze-audio",
+        help="Extract objective descriptors and music embeddings from permitted local audio.",
+    )
+    audio_parser.add_argument(
+        "manifest",
+        type=Path,
+        help="Private JSON Lines manifest mapping stable track IDs to permitted audio files",
+    )
+    audio_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Ignored local JSON Lines destination for feature observations",
+    )
+    audio_parser.add_argument(
+        "--feature-config",
+        type=Path,
+        help="Optional versioned feature YAML; built-in defaults are used when omitted",
+    )
+    audio_parser.add_argument(
+        "--embedding-model",
+        type=Path,
+        default=Path("artifacts/models/discogs-effnet-bsdynamic-1.onnx"),
+        help="Pinned Discogs-EffNet ONNX model",
+    )
+    audio_parser.add_argument(
+        "--skip-embeddings",
+        action="store_true",
+        help="Extract objective descriptors without running the embedding model",
+    )
+    audio_parser.add_argument(
+        "--window-output-dir",
+        type=Path,
+        help="Optional ignored directory for private window-level embedding NPZ files",
+    )
+
+    model_parser = subparsers.add_parser(
+        "download-embedding-model",
+        help="Download and verify the pinned noncommercial Discogs-EffNet ONNX model.",
+    )
+    model_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("artifacts/models/discogs-effnet-bsdynamic-1.onnx"),
+        help="Ignored local model destination",
+    )
+    model_parser.add_argument(
+        "--accept-noncommercial-license",
+        action="store_true",
+        help="Acknowledge the model's CC BY-NC-SA 4.0 license",
+    )
     return parser
 
 
@@ -90,5 +143,68 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(f"Aggregated {len(affinities)} track affinity records.")
         print(f"Wrote privacy-cleaned output to {args.output_dir}")
+        return 0
+    if args.command == "download-embedding-model":
+        from myusic_engine.embeddings import EmbeddingExtractionError, download_model
+
+        try:
+            destination = download_model(
+                args.output,
+                accept_noncommercial_license=args.accept_noncommercial_license,
+            )
+        except (EmbeddingExtractionError, OSError) as exc:
+            print(f"Embedding model download failed: {exc}", file=sys.stderr)
+            return 2
+        print(f"Downloaded and SHA-256 verified the pinned model at {destination}")
+        return 0
+    if args.command == "analyze-audio":
+        from myusic_engine.audio import AudioInputError, read_audio_manifest
+        from myusic_engine.embeddings import (
+            DiscogsEffnetOnnxBackend,
+            EmbeddingExtractionError,
+        )
+        from myusic_engine.features.config import (
+            FeatureConfigError,
+            ObjectiveFeatureConfig,
+            load_objective_feature_config,
+        )
+        from myusic_engine.features.objective import AudioAnalysisError
+        from myusic_engine.features.pipeline import analyze_audio_assets
+        from myusic_engine.features.records import FeatureRecordError, write_feature_observations
+
+        try:
+            audio_config = (
+                load_objective_feature_config(args.feature_config)
+                if args.feature_config
+                else ObjectiveFeatureConfig()
+            )
+            backend = (
+                None if args.skip_embeddings else DiscogsEffnetOnnxBackend(args.embedding_model)
+            )
+            assets = read_audio_manifest(args.manifest)
+            audio_result = analyze_audio_assets(
+                assets,
+                config=audio_config,
+                embedding_backend=backend,
+                window_output_dir=args.window_output_dir,
+            )
+            write_feature_observations(audio_result.observations, args.output)
+        except (
+            AudioAnalysisError,
+            AudioInputError,
+            EmbeddingExtractionError,
+            FeatureConfigError,
+            FeatureRecordError,
+            OSError,
+        ) as exc:
+            print(f"Audio analysis failed: {exc}", file=sys.stderr)
+            return 2
+        print(
+            f"Analyzed {audio_result.tracks_analyzed} tracks into "
+            f"{len(audio_result.observations)} feature observations."
+        )
+        if backend is not None:
+            print(f"Aggregated {audio_result.embedding_windows} Discogs-EffNet windows.")
+        print(f"Wrote feature observations to {args.output}")
         return 0
     return 2

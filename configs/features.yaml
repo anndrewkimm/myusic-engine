@@ -13,15 +13,33 @@ audio:
   target_sample_rate_hz: 44100
   minimum_coverage_seconds: 20.0
 
+extractor:
+  source_version: objective-dsp-0.1.0
+  frame_length: 4096
+  hop_length: 1024
+  rhythm_frame_length: 2048
+  rhythm_hop_length: 512
+
 features:
   tempo_bpm_estimate_v1:
     unit: beats_per_minute
     range: [20.0, 300.0]
+  beat_strength_v1:
+    unit: ratio
+    range: [0.0, 1.0]
+  onset_rate_hz_v1:
+    unit: onsets_per_second
+  key_estimate_v1:
+    unit: pitch_class_and_mode
+  mode_estimate_v1:
+    unit: category
   key_strength_v1:
     unit: ratio
     range: [0.0, 1.0]
   integrated_loudness_lufs_v1:
     unit: LUFS
+  dynamic_range_db_v1:
+    unit: decibels
   bass_energy_ratio_150hz_v1:
     unit: ratio
     range: [0.0, 1.0]
@@ -30,6 +48,25 @@ features:
     range: [0.0, 1.0]
   spectral_centroid_hz_v1:
     unit: hertz
+  spectral_rolloff_85_hz_v1:
+    unit: hertz
+  spectral_flatness_v1:
+    unit: ratio
+    range: [0.0, 1.0]
   chroma_mean_v1:
     unit: normalized_vector
     dimensions: 12
+  mfcc_mean_v1:
+    unit: vector
+    dimensions: 20
+  mfcc_std_v1:
+    unit: vector
+    dimensions: 20
+
+embedding:
+  feature_name: discogs_effnet_embedding_v1
+  feature_source: mtg_essentia_onnx
+  source_version: discogs-effnet-bsdynamic-1+musicnn-preprocess-v1+mean-l2-v1
+  dimensions: 1280
+  sample_rate_hz: 16000
+  pooling: arithmetic_mean_then_l2_normalize

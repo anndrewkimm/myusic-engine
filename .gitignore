@@ -49,3 +49,6 @@ my_spotify_data*.zip
 .ipynb_checkpoints/
 mlruns/
 artifacts/
+
+# Private mapping from stable track IDs to permitted local audio
+audio_manifest.jsonl

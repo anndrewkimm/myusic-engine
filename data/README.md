@@ -14,3 +14,7 @@ data/
 Keep the Spotify export ZIP in `data/private/`. Do not rename a real export to match a test
 fixture, and never force-add ignored data. Tests use only reserved example values in
 `tests/fixtures/`.
+
+Keep the permitted-audio manifest and all referenced personal audio under ignored paths as well.
+The manifest is a private join table and must declare `owned`, `licensed`, `public_domain`, or
+`creative_commons` as the rights basis for every file analyzed.

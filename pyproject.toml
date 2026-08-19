@@ -16,11 +16,24 @@ dependencies = ["PyYAML>=6.0,<7"]
 myusic-engine = "myusic_engine.cli:main"
 
 [project.optional-dependencies]
+phase3 = [
+  "librosa>=0.11,<0.12",
+  "numpy>=2.0,<3",
+  "onnxruntime>=1.22,<2",
+  "pyloudnorm>=0.1.1,<0.2",
+  "scipy>=1.14,<2",
+  "soundfile>=0.13,<0.14",
+]
 dev = [
+  "librosa>=0.11,<0.12",
   "mypy>=1.14,<2",
+  "numpy>=2.0,<3",
+  "pyloudnorm>=0.1.1,<0.2",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
+  "scipy>=1.14,<2",
+  "soundfile>=0.13,<0.14",
   "types-PyYAML>=6.0,<7",
 ]
 
@@ -51,3 +64,7 @@ select = ["B", "E", "F", "I", "SIM", "UP"]
 python_version = "3.11"
 strict = true
 packages = ["myusic_engine"]
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime", "pyloudnorm", "scipy.*", "soundfile"]
+ignore_missing_imports = true
