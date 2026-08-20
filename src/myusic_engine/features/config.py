@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,11 +21,16 @@ class ObjectiveFeatureConfig:
 
     target_sample_rate_hz: int = 44_100
     minimum_coverage_seconds: float = 20.0
-    source_version: str = "objective-dsp-0.1.0"
+    source_version: str = "objective-dsp-0.2.0"
     frame_length: int = 4096
     hop_length: int = 1024
     rhythm_frame_length: int = 2048
     rhythm_hop_length: int = 512
+    rhythm_onset_max_size: int = 5
+    rhythm_onset_absolute_floor: float = 0.3
+    rhythm_onset_mad_multiplier: float = 3.0
+    rhythm_onset_wait_frames: int = 3
+    minimum_tempo_beats: int = 4
 
     def __post_init__(self) -> None:
         if not 8_000 <= self.target_sample_rate_hz <= 96_000:
@@ -33,10 +39,22 @@ class ObjectiveFeatureConfig:
             raise FeatureConfigError("minimum_coverage_seconds must be positive")
         if not self.source_version.strip():
             raise FeatureConfigError("source_version must be non-empty")
-        for name in ("frame_length", "hop_length", "rhythm_frame_length", "rhythm_hop_length"):
+        for name in (
+            "frame_length",
+            "hop_length",
+            "rhythm_frame_length",
+            "rhythm_hop_length",
+            "rhythm_onset_max_size",
+            "rhythm_onset_wait_frames",
+            "minimum_tempo_beats",
+        ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise FeatureConfigError(f"{name} must be a positive integer")
+        for name in ("rhythm_onset_absolute_floor", "rhythm_onset_mad_multiplier"):
+            value = getattr(self, name)
+            if not math.isfinite(value) or value <= 0:
+                raise FeatureConfigError(f"{name} must be a positive finite number")
         if self.hop_length > self.frame_length:
             raise FeatureConfigError("hop_length must not exceed frame_length")
         if self.rhythm_hop_length > self.rhythm_frame_length:
@@ -90,4 +108,9 @@ def load_objective_feature_config(path: str | Path) -> ObjectiveFeatureConfig:
         hop_length=_integer(extractor, "hop_length"),
         rhythm_frame_length=_integer(extractor, "rhythm_frame_length"),
         rhythm_hop_length=_integer(extractor, "rhythm_hop_length"),
+        rhythm_onset_max_size=_integer(extractor, "rhythm_onset_max_size"),
+        rhythm_onset_absolute_floor=_number(extractor, "rhythm_onset_absolute_floor"),
+        rhythm_onset_mad_multiplier=_number(extractor, "rhythm_onset_mad_multiplier"),
+        rhythm_onset_wait_frames=_integer(extractor, "rhythm_onset_wait_frames"),
+        minimum_tempo_beats=_integer(extractor, "minimum_tempo_beats"),
     )

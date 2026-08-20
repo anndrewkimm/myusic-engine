@@ -14,11 +14,16 @@ audio:
   minimum_coverage_seconds: 20.0
 
 extractor:
-  source_version: objective-dsp-0.1.0
+  source_version: objective-dsp-0.2.0
   frame_length: 4096
   hop_length: 1024
   rhythm_frame_length: 2048
   rhythm_hop_length: 512
+  rhythm_onset_max_size: 5
+  rhythm_onset_absolute_floor: 0.3
+  rhythm_onset_mad_multiplier: 3.0
+  rhythm_onset_wait_frames: 3
+  minimum_tempo_beats: 4
 
 features:
   tempo_bpm_estimate_v1:
@@ -70,3 +75,16 @@ embedding:
   dimensions: 1280
   sample_rate_hz: 16000
   pooling: arithmetic_mean_then_l2_normalize
+
+learned_scores:
+  feature_source: mtg_essentia_classifier_onnx
+  input: raw_discogs_effnet_window_embeddings
+  pooling: arithmetic_mean_of_window_softmax_scores
+  calibration: uncalibrated
+  features:
+    - danceable_score_v1
+    - acoustic_score_v1
+    - instrumental_score_v1
+    - happy_score_v1
+    - aggressive_score_v1
+    - relaxed_score_v1

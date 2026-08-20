@@ -22,12 +22,16 @@ The phase-3 foundation currently provides:
 - deterministic mono decoding and resampling;
 - 15–16 objective observations per analyzable track;
 - a pinned, SHA-256-verified Discogs-EffNet ONNX model;
+- six pinned, SHA-256-verified classifier heads for interpretable learned audio scores;
 - exact MusiCNN-style 16 kHz log-mel preprocessing;
-- retained overlapping window embeddings;
+- retained overlapping window embeddings and learned score trajectories;
 - arithmetic-mean pooling followed by L2 normalization;
+- robust onset gating that abstains on stationary tones instead of inventing tempo;
 - direct compatibility with the existing 1,280-dimensional cosine index;
 - unit and synthetic transformation tests plus a real ONNX inference smoke test.
 
-It deliberately does not yet emit Spotify-named `danceability`, `energy`, `valence`,
-`acousticness`, `speechiness`, or `instrumentalness` values. Those are subjective/learned proxies
-and should be added only with labeled calibration data, a benchmark, and a model card.
+It deliberately does not emit Spotify-named `danceability`, `energy`, `valence`, `acousticness`,
+`speechiness`, or `instrumentalness` values. The learned outputs use custom `*_score_v1` names and
+remain uncalibrated until a permitted labeled corpus and held-out benchmark exist. Energy,
+speechiness, liveness, time signature, and valence-equivalent outputs remain unimplemented rather
+than being filled with unsupported heuristics.

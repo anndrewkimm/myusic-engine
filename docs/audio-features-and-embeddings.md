@@ -24,15 +24,15 @@ confidence. Objective and embedding confidence remain separate from identity-mat
 
 ## Objective DSP feature set v1
 
-The default extractor analyzes mono 44.1 kHz audio with a 4,096-sample Hann window and 1,024-sample
+Objective DSP v0.2.0 analyzes mono 44.1 kHz audio with a 4,096-sample Hann window and 1,024-sample
 hop. Rhythm analysis uses a 2,048-sample frame and 512-sample hop. Configuration changes that alter
 values require a new `source_version`.
 
 | Feature | Definition | Main limitation |
 |---|---|---|
-| `tempo_bpm_estimate_v1` | Onset-envelope beat tracker estimate | Half/double tempo and weak-rhythm ambiguity |
-| `beat_strength_v1` | Mean beat-synchronous onset strength relative to the onset-envelope 95th percentile | Not a calibrated danceability score |
-| `onset_rate_hz_v1` | Detected spectral onsets per analyzed second | Sensitive to percussion density and mastering |
+| `tempo_bpm_estimate_v1` | Robust-gated onset-envelope beat tracker estimate with a minimum tracked-beat requirement | Half/double tempo and weak-rhythm ambiguity |
+| `beat_strength_v1` | Mean beat-synchronous gated onset strength relative to active-onset peaks | Not a calibrated danceability score |
+| `onset_rate_hz_v1` | Robust-gated spectral onsets per analyzed second | Sensitive to percussion density and mastering |
 | `key_estimate_v1`, `mode_estimate_v1` | A440-referenced mean chroma matched against rotated major/minor key profiles | Detuning, ambiguous keys, modulations, and relative major/minor |
 | `key_strength_v1` | Key-profile correlation weighted by chroma concentration | Heuristic confidence, not probability |
 | `integrated_loudness_lufs_v1` | BS.1770-style gated integrated loudness via `pyloudnorm` | Short or unusual signals may not yield a value |
@@ -45,8 +45,10 @@ values require a new `source_version`.
 | `mfcc_mean_v1`, `mfcc_std_v1` | Mean and standard deviation of 20 MFCCs | Discards temporal structure |
 
 Coverage confidence reaches 1.0 at 20 seconds. Tempo and key observations additionally reduce
-confidence according to periodicity and tonal strength. Unmeasurable tempo or loudness is omitted;
-silence is rejected instead of receiving invented values.
+confidence according to periodicity and tonal strength. The rhythm frontend suppresses
+frequency-local leakage, gates against both an absolute floor and a median-absolute-deviation noise
+floor, and requires at least four tracked beats. Unmeasurable tempo or loudness is omitted; silence
+is rejected instead of receiving invented values.
 
 ## Discogs-EffNet embedding v1
 
@@ -85,6 +87,32 @@ commercial use. Model and Essentia documentation:
 - https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.json
 - https://github.com/MTG/essentia
 
+## Learned audio score pack v1
+
+Six pinned Essentia binary classifier heads reuse the raw 1,280-dimensional window embeddings. This
+adds only small feed-forward models rather than decoding audio or running the base network again.
+
+| Feature | Positive class | Interpretation |
+|---|---|---|
+| `danceable_score_v1` | danceable | Learned danceable/not-danceable Softmax score |
+| `acoustic_score_v1` | acoustic | Learned acoustic/non-acoustic Softmax score |
+| `instrumental_score_v1` | instrumental | Learned instrumental/voice Softmax score |
+| `happy_score_v1` | happy | Learned happy/non-happy Softmax score |
+| `aggressive_score_v1` | aggressive | Learned aggressive/non-aggressive Softmax score |
+| `relaxed_score_v1` | relaxed | Learned relaxed/non-relaxed Softmax score |
+
+For each feature, the track value is the arithmetic mean of the positive-class score across all
+windows. The model SHA-256, class ordering, and positive-class index are pinned in code. The output
+is explicitly a score, not a calibrated probability and not a Spotify value. Feature confidence
+combines coverage, mean classification margin, and cross-window agreement. Window scores are saved
+beside embeddings when `--window-output-dir` is used so later calibration can change without
+re-extracting audio.
+
+Run `download-feature-head-models --accept-noncommercial-license`, then pass
+`--feature-head-model-dir artifacts/models/feature-heads` to `analyze-audio`. Exact source-task
+sizes, reported validation metrics, Spotify concept boundaries, and the fine-tuning plan are in
+[Spotify-like feature research](spotify-like-feature-research.md).
+
 ## Validation completed
 
 Automated synthetic tests currently verify:
@@ -98,6 +126,8 @@ Automated synthetic tests currently verify:
 - manifest rights declarations, decoding, mono mixing, and resampling;
 - end-to-end CLI output without requiring private data;
 - real ONNX Runtime inference using the pinned model on a generated signal.
+- verified ONNX inference through all six pinned classifier heads;
+- rhythm abstention on a stationary tone that previously produced a false tempo.
 
 ## Required before phase-3 exit
 
@@ -107,8 +137,7 @@ Automated synthetic tests currently verify:
 4. Measure Recall@K / nDCG@K on those pairs and compare embeddings against handcrafted features.
 5. Inspect nearest neighbors across genres and underrepresented music for obvious failure modes.
 6. Decide whether robust or section-aware pooling improves retrieval over the mean baseline.
-
-Only after those representations are stable should calibrated `energy`, `danceability`,
-`acousticness`, `instrumentalness`, `speechiness`, or `valence` proxies be trained. Each proxy needs a
-labeled target definition, baseline, cross-validation protocol, calibration curve, and separate
-model version.
+7. Collect independent labels and calibrate learned scores with artist-grouped splits.
+8. Add scalar energy, speechiness, liveness, meter, or valence analogues only when each has a labeled
+   target definition, baseline, cross-validation protocol, calibration curve, and separate model
+   version.

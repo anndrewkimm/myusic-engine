@@ -84,6 +84,13 @@ def _parser() -> argparse.ArgumentParser:
         help="Extract objective descriptors without running the embedding model",
     )
     audio_parser.add_argument(
+        "--feature-head-model-dir",
+        type=Path,
+        help=(
+            "Optional pinned Essentia classifier-head directory; enables learned audio scores"
+        ),
+    )
+    audio_parser.add_argument(
         "--window-output-dir",
         type=Path,
         help="Optional ignored directory for private window-level embedding NPZ files",
@@ -103,6 +110,22 @@ def _parser() -> argparse.ArgumentParser:
         "--accept-noncommercial-license",
         action="store_true",
         help="Acknowledge the model's CC BY-NC-SA 4.0 license",
+    )
+
+    feature_head_parser = subparsers.add_parser(
+        "download-feature-head-models",
+        help="Download and verify the pinned noncommercial learned audio score models.",
+    )
+    feature_head_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("artifacts/models/feature-heads"),
+        help="Ignored local model-pack destination",
+    )
+    feature_head_parser.add_argument(
+        "--accept-noncommercial-license",
+        action="store_true",
+        help="Acknowledge the models' CC BY-NC-SA 4.0 license",
     )
     return parser
 
@@ -157,6 +180,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         print(f"Downloaded and SHA-256 verified the pinned model at {destination}")
         return 0
+    if args.command == "download-feature-head-models":
+        from myusic_engine.features.learned import (
+            LearnedFeatureError,
+            download_feature_head_models,
+        )
+
+        try:
+            destinations = download_feature_head_models(
+                args.output_dir,
+                accept_noncommercial_license=args.accept_noncommercial_license,
+            )
+        except (LearnedFeatureError, OSError) as exc:
+            print(f"Feature-head model download failed: {exc}", file=sys.stderr)
+            return 2
+        print(
+            f"Downloaded and SHA-256 verified {len(destinations)} pinned models "
+            f"under {args.output_dir}"
+        )
+        return 0
     if args.command == "analyze-audio":
         from myusic_engine.audio import AudioInputError, read_audio_manifest
         from myusic_engine.embeddings import (
@@ -167,6 +209,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             FeatureConfigError,
             ObjectiveFeatureConfig,
             load_objective_feature_config,
+        )
+        from myusic_engine.features.learned import (
+            DiscogsEffnetFeatureHeadBackend,
+            LearnedFeatureError,
         )
         from myusic_engine.features.objective import AudioAnalysisError
         from myusic_engine.features.pipeline import analyze_audio_assets
@@ -181,11 +227,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             backend = (
                 None if args.skip_embeddings else DiscogsEffnetOnnxBackend(args.embedding_model)
             )
+            feature_head_backend = (
+                DiscogsEffnetFeatureHeadBackend(args.feature_head_model_dir)
+                if args.feature_head_model_dir is not None
+                else None
+            )
             assets = read_audio_manifest(args.manifest)
             audio_result = analyze_audio_assets(
                 assets,
                 config=audio_config,
                 embedding_backend=backend,
+                feature_head_backend=feature_head_backend,
                 window_output_dir=args.window_output_dir,
             )
             write_feature_observations(audio_result.observations, args.output)
@@ -195,6 +247,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             EmbeddingExtractionError,
             FeatureConfigError,
             FeatureRecordError,
+            LearnedFeatureError,
             OSError,
         ) as exc:
             print(f"Audio analysis failed: {exc}", file=sys.stderr)
@@ -205,6 +258,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if backend is not None:
             print(f"Aggregated {audio_result.embedding_windows} Discogs-EffNet windows.")
+        if feature_head_backend is not None:
+            print(f"Emitted {audio_result.learned_scores} learned audio scores.")
         print(f"Wrote feature observations to {args.output}")
         return 0
     return 2

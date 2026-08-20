@@ -23,6 +23,8 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 - objective DSP descriptors including tempo, key/mode, loudness, bass energy, chroma, and
   spectral/timbre measurements;
 - verified cross-platform ONNX inference for 1,280-dimensional Discogs-EffNet embeddings;
+- six versioned learned scores for danceable, acoustic, instrumental, happy, aggressive, and
+  relaxed audio characteristics;
 - exact cosine retrieval with weighted multi-seed queries and provenance-aware filters.
 
 The pending export is not needed for the test suite. Phase 1 is code-complete but still needs
@@ -90,14 +92,16 @@ to audio that you are allowed to analyze:
 ```
 
 Download the pinned embedding model after reviewing its CC BY-NC-SA 4.0 license, then run both
-objective descriptors and embeddings:
+objective descriptors, embeddings, and the optional learned score pack:
 
 ```powershell
 python -m myusic_engine download-embedding-model --accept-noncommercial-license
+python -m myusic_engine download-feature-head-models --accept-noncommercial-license
 python -m myusic_engine analyze-audio `
   "data/private/audio_manifest.jsonl" `
   --output "data/processed/audio/features.jsonl" `
   --feature-config "configs/features.yaml" `
+  --feature-head-model-dir "artifacts/models/feature-heads" `
   --window-output-dir "data/interim/embedding-windows"
 ```
 
@@ -105,6 +109,8 @@ The aggregate embedding is directly compatible with the existing cosine similari
 Window-level vectors remain private and available for later robust or section-aware pooling. Exact
 definitions, limitations, and validation requirements are in the
 [phase-3 feature/model card](docs/audio-features-and-embeddings.md).
+The clean-room mapping to Spotify's published concepts, explicit non-parity boundaries, and
+calibration plan are in [Spotify-like feature research](docs/spotify-like-feature-research.md).
 
 ## Why this is a data-science project
 

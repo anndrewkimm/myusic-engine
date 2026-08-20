@@ -47,6 +47,18 @@ def test_known_click_track_has_expected_tempo() -> None:
     assert float(values["onset_rate_hz_v1"]) == pytest.approx(2.0, abs=0.25)
 
 
+def test_stationary_tone_abstains_from_spurious_rhythm_measurements() -> None:
+    observations = ObjectiveFeatureExtractor(CONFIG).extract(
+        "stationary-tone",
+        DecodedAudio(_tones((440.0,), 8.0), SAMPLE_RATE),
+    )
+    values = {observation.feature_name: observation.value for observation in observations}
+
+    assert "tempo_bpm_estimate_v1" not in values
+    assert values["beat_strength_v1"] == 0.0
+    assert values["onset_rate_hz_v1"] == 0.0
+
+
 def test_bass_energy_ratios_respond_monotonically_to_frequency() -> None:
     bass = _values(_tones((80.0,), 5.0))
     treble = _values(_tones((2_000.0,), 5.0))

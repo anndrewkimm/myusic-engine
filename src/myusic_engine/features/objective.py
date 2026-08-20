@@ -89,19 +89,30 @@ def _tempo_analysis(
         sr=sample_rate_hz,
         n_fft=config.rhythm_frame_length,
         hop_length=config.rhythm_hop_length,
+        max_size=config.rhythm_onset_max_size,
     )
+    onset_median = float(np.median(onset_envelope))
+    onset_mad = float(np.median(np.abs(onset_envelope - onset_median)))
+    robust_floor = onset_median + (
+        config.rhythm_onset_mad_multiplier * 1.4826 * onset_mad
+    )
+    onset_floor = max(config.rhythm_onset_absolute_floor, robust_floor)
+    gated_envelope = np.maximum(onset_envelope - onset_floor, 0.0)
     onset_frames = librosa.onset.onset_detect(
-        onset_envelope=onset_envelope,
+        onset_envelope=gated_envelope,
         sr=sample_rate_hz,
         hop_length=config.rhythm_hop_length,
         units="frames",
+        normalize=False,
+        delta=1e-6,
+        wait=config.rhythm_onset_wait_frames,
     )
     duration_seconds = samples.size / sample_rate_hz
     onset_rate = float(len(onset_frames) / duration_seconds)
-    if onset_envelope.size < 2 or float(np.max(onset_envelope)) <= 1e-10:
+    if gated_envelope.size < 2 or float(np.max(gated_envelope)) <= 1e-10:
         return _TempoAnalysis(None, 0.0, 0.0, onset_rate)
     raw_tempo, beat_frames = librosa.beat.beat_track(
-        onset_envelope=onset_envelope,
+        onset_envelope=gated_envelope,
         sr=sample_rate_hz,
         hop_length=config.rhythm_hop_length,
         sparse=True,
@@ -110,22 +121,25 @@ def _tempo_analysis(
     tempo = float(tempo_values[0]) if tempo_values.size else float("nan")
     if not math.isfinite(tempo) or not 20.0 <= tempo <= 300.0:
         return _TempoAnalysis(None, 0.0, 0.0, onset_rate)
+    beat_frames_array = np.asarray(beat_frames, dtype=np.int64)
+    if beat_frames_array.size < config.minimum_tempo_beats:
+        return _TempoAnalysis(None, 0.0, 0.0, onset_rate)
     period = int(round(60.0 * sample_rate_hz / (tempo * config.rhythm_hop_length)))
-    centered = np.asarray(onset_envelope, dtype=np.float64) - float(np.mean(onset_envelope))
+    centered = np.asarray(gated_envelope, dtype=np.float64) - float(np.mean(gated_envelope))
     denominator = float(np.dot(centered, centered))
     periodicity = 0.0
     if denominator > 1e-12 and 0 < period < centered.size:
         periodicity = _clamp_ratio(
             float(np.dot(centered[:-period], centered[period:])) / denominator
         )
-    beat_frames_array = np.asarray(beat_frames, dtype=np.int64)
     beat_count_factor = min(1.0, beat_frames_array.size / 8.0)
     confidence = _clamp_ratio(math.sqrt(periodicity) * beat_count_factor)
-    peak = float(np.percentile(onset_envelope, 95))
+    active_onsets = gated_envelope[gated_envelope > 0.0]
+    peak = float(np.percentile(active_onsets, 95)) if active_onsets.size else 0.0
     beat_strength = 0.0
-    valid_beats = beat_frames_array[beat_frames_array < onset_envelope.size]
+    valid_beats = beat_frames_array[beat_frames_array < gated_envelope.size]
     if peak > 1e-12 and valid_beats.size:
-        beat_strength = _clamp_ratio(float(np.mean(onset_envelope[valid_beats])) / peak)
+        beat_strength = _clamp_ratio(float(np.mean(gated_envelope[valid_beats])) / peak)
     return _TempoAnalysis(tempo, confidence, beat_strength, onset_rate)
 
 
