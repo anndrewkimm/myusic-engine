@@ -3,9 +3,9 @@
 A private, local-first music intelligence pipeline for learning from Spotify listening
 behavior and combining it with independently computed or lawfully sourced audio features.
 
-The Spotify Extended Streaming History export is currently pending. Development therefore
-uses synthetic records and permitted test signals; no real listening history or copyrighted
-Spotify audio is required to build or test the foundation.
+The compact Spotify Account Data export has been validated locally. The richer Extended Streaming
+History export is still pending; no copyrighted Spotify audio is required to build or test the
+foundation.
 
 > [!IMPORTANT]
 > Raw Spotify exports, account data, and audio files are private inputs. They are ignored by
@@ -27,10 +27,11 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
   relaxed audio characteristics;
 - exact cosine retrieval with weighted multi-seed queries and provenance-aware filters.
 
-The pending export is not needed for the test suite. Phase 1 is code-complete but still needs
-real-export validation. Phase 2 identity resolution is unstarted. Phase 3 now has a tested
-foundation, but its exit criterion still requires transformation tests and quality evaluation on
-a permitted real music corpus. See [current project status](docs/project-status.md).
+The pending Extended export is not needed for the test suite. Phase 1 has been validated against
+the compact Account Data format, but still needs Extended-history validation and private EDA.
+Phase 2 identity resolution is unstarted. Phase 3 now has a tested foundation, but its exit
+criterion still requires transformation tests and quality evaluation on a permitted real music
+corpus. See [current project status](docs/project-status.md).
 
 ## Development setup
 
@@ -78,8 +79,11 @@ mapping track URIs to positive duration milliseconds can be supplied with `--dur
 reason-based completion remains separately coverage-scored when duration is unavailable.
 
 No unpacking or renaming is required: `prepare-history` discovers every recognized history JSON
-inside the ZIP and ignores unrelated account files. The detailed handoff and validation checklist
-is in [Spotify export handoff](docs/spotify-export-handoff.md).
+inside the ZIP and ignores unrelated account files. Both Extended Streaming History and the
+compact Account Data `StreamingHistory_music_*` / `StreamingHistory_podcast_*` formats are
+accepted. Compact Account Data does not include Spotify URIs or the richer playback signals, so
+its track identities fall back to deterministic metadata hashes. The detailed handoff and
+validation checklist is in [Spotify export handoff](docs/spotify-export-handoff.md).
 
 ## Analyze permitted audio
 

@@ -5,7 +5,7 @@ This status distinguishes implemented code from validation on inputs that have n
 | Phase | Status | Evidence still needed |
 |---|---|---|
 | 0 — data-independent foundation | Complete | None for the synthetic foundation |
-| 1 — personal history foundation | Code-complete, data-pending | Run the original Spotify ZIP, inspect rejection and coverage reports, and perform private EDA |
+| 1 — personal history foundation | Compact Account Data validated | Validate the Extended History ZIP for lifetime/URI-rich coverage and perform private EDA |
 | 2 — identity resolution | Not started | Metadata provider adapter, exact/fuzzy match policy, confidence report, and manual review sample |
 | 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, transformation tests, pairwise sanity set, and retrieval-quality evaluation |
 | 4 — taste map and similarity | Retrieval primitive implemented early | Standardization, clustering experiments, real vectors, and cluster/retrieval evaluation |

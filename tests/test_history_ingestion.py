@@ -7,7 +7,6 @@ import pytest
 from myusic_engine.cli import main
 from myusic_engine.ingest import HistoryRecordError, load_history, prepare_history
 
-
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "spotify_history_synthetic.json"
 
 
@@ -43,6 +42,52 @@ def test_zip_reads_only_history_files_and_deduplicates_overlaps(tmp_path: Path) 
         "Streaming_History_Audio_0.json",
         "Streaming_History_Audio_1.json",
     )
+
+
+def test_zip_accepts_compact_account_data_music_and_podcast_files(tmp_path: Path) -> None:
+    archive_path = tmp_path / "account-data.zip"
+    music_records = [
+        {
+            "endTime": "2025-01-01 10:00",
+            "artistName": "Synthetic Artist",
+            "trackName": "Synthetic Track",
+            "msPlayed": 123456,
+        }
+    ]
+    podcast_records = [
+        {
+            "endTime": "2025-01-02 11:30",
+            "podcastName": "Synthetic Show",
+            "episodeName": "Synthetic Episode",
+            "msPlayed": 654321,
+        }
+    ]
+    with ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "Spotify Account Data/StreamingHistory_music_0.json", json.dumps(music_records)
+        )
+        archive.writestr(
+            "Spotify Account Data/StreamingHistory_podcast_0.json", json.dumps(podcast_records)
+        )
+        archive.writestr("Spotify Account Data/Identity.json", '{"username": "do-not-read"}')
+
+    result = load_history(archive_path)
+
+    assert result.report.records_seen == 2
+    assert result.report.records_rejected == 0
+    assert result.report.media_counts == {"track": 1, "episode": 1}
+    assert result.report.source_files == (
+        "StreamingHistory_music_0.json",
+        "StreamingHistory_podcast_0.json",
+    )
+    track, episode = result.events
+    assert track.played_at == "2025-01-01T10:00:00.000Z"
+    assert track.track_name == "Synthetic Track"
+    assert track.artist_name == "Synthetic Artist"
+    assert track.track_uri is None
+    assert episode.played_at == "2025-01-02T11:30:00.000Z"
+    assert episode.episode_name == "Synthetic Episode"
+    assert episode.show_name == "Synthetic Show"
 
 
 def test_invalid_records_are_reported_safely_or_raise_in_strict_mode(tmp_path: Path) -> None:

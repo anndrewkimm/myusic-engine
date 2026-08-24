@@ -8,7 +8,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import TextIO, cast
 from zipfile import BadZipFile, ZipFile
@@ -23,9 +23,17 @@ from myusic_engine.ingest.models import (
 from myusic_engine.io import atomic_write_text
 from myusic_engine.privacy import assert_privacy_safe, find_sensitive_fields
 
-
 _SPOTIFY_URI_PATTERN = re.compile(r"^spotify:(track|episode):[A-Za-z0-9]{22}$")
 _MAX_REPORTED_ISSUES = 100
+
+_ACCOUNT_DATA_FIELD_ALIASES = {
+    "endTime": "ts",
+    "msPlayed": "ms_played",
+    "trackName": "master_metadata_track_name",
+    "artistName": "master_metadata_album_artist_name",
+    "episodeName": "episode_name",
+    "podcastName": "episode_show_name",
+}
 
 
 class HistoryIngestionError(ValueError):
@@ -42,6 +50,34 @@ class HistoryRecordError(HistoryIngestionError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def _canonicalize_account_data_record(record: Mapping[str, object]) -> Mapping[str, object]:
+    """Map Spotify's compact Account Data fields onto the extended-history names.
+
+    Account Data timestamps omit an offset, but Spotify defines ``endTime`` as UTC. Other
+    timestamp fields still have to carry an explicit offset and are validated unchanged.
+    """
+
+    if not any(field_name in record for field_name in _ACCOUNT_DATA_FIELD_ALIASES):
+        return record
+
+    canonical = dict(record)
+    for account_field, canonical_field in _ACCOUNT_DATA_FIELD_ALIASES.items():
+        if canonical_field in canonical or account_field not in record:
+            continue
+        value = record[account_field]
+        if account_field == "endTime" and isinstance(value, str):
+            candidate = value.strip()
+            try:
+                parsed = datetime.fromisoformat(candidate)
+            except ValueError:
+                pass
+            else:
+                if parsed.tzinfo is None:
+                    value = parsed.replace(tzinfo=UTC).isoformat()
+        canonical[canonical_field] = value
+    return canonical
 
 
 def _optional_string(record: Mapping[str, object], field_name: str) -> str | None:
@@ -85,7 +121,7 @@ def _utc_timestamp(record: Mapping[str, object]) -> str:
         raise HistoryRecordError("invalid_timestamp", "Field 'ts' is not valid ISO-8601") from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise HistoryRecordError("invalid_timestamp", "Field 'ts' must include a timezone")
-    return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return parsed.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _spotify_uri(record: Mapping[str, object], field_name: str, expected_type: str) -> str | None:
@@ -158,6 +194,7 @@ def normalize_history_record(
 ) -> NormalizedListeningEvent:
     """Normalize one raw record through an explicit privacy allowlist."""
 
+    record = _canonicalize_account_data_record(record)
     played_at = _utc_timestamp(record)
     ms_played = _milliseconds_played(record)
     track_uri = _spotify_uri(record, "spotify_track_uri", "track")
@@ -228,6 +265,7 @@ def _looks_like_history_file(name: str) -> bool:
     return lowered.endswith(".json") and (
         lowered.startswith("streaming_history_audio_")
         or lowered.startswith("streaminghistory_music_")
+        or lowered.startswith("streaminghistory_podcast_")
         or lowered.startswith("endsong")
     )
 
@@ -273,9 +311,11 @@ def _source_batches(source: Path) -> Iterator[tuple[str, Sequence[object]]]:
                     raise HistoryInputError("ZIP contains no recognized Spotify history JSON files")
                 for member in members:
                     source_label = PurePosixPath(member.filename).name
-                    with archive.open(member) as binary_stream:
-                        with io.TextIOWrapper(binary_stream, encoding="utf-8-sig") as stream:
-                            yield source_label, _records_from_stream(stream, source_label)
+                    with (
+                        archive.open(member) as binary_stream,
+                        io.TextIOWrapper(binary_stream, encoding="utf-8-sig") as stream,
+                    ):
+                        yield source_label, _records_from_stream(stream, source_label)
         except BadZipFile as exc:
             raise HistoryInputError("History source is not a valid ZIP archive") from exc
         return

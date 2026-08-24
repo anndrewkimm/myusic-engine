@@ -10,11 +10,18 @@ python -m myusic_engine prepare-history `
   --recommendation-config "configs/recommendation.yaml"
 ```
 
-No manual extraction is required. The reader walks nested ZIP paths, selects recognized extended
-audio-history files, accepts the historical `endsong*.json` and newer
-`Streaming_History_Audio_*.json` / `StreamingHistory_music_*.json` naming families, and ignores
-unrelated account JSON. It normalizes all selected arrays, deduplicates across files, separates
-tracks from episodes, and writes files atomically.
+No manual extraction is required. The reader walks nested ZIP paths and accepts Extended Streaming
+History files named `endsong*.json` or `Streaming_History_Audio_*.json`. It also accepts compact
+Account Data files named `StreamingHistory_music_*.json` or
+`StreamingHistory_podcast_*.json`, while ignoring unrelated account JSON. It normalizes all
+selected arrays, deduplicates across files, separates tracks from episodes, and writes files
+atomically.
+
+The compact Account Data format contains only end time, milliseconds played, and track/artist or
+podcast/episode names. Its documented `endTime` is interpreted as UTC. Because it has no Spotify
+URIs, album names, skip reasons, shuffle state, or other Extended History fields, track aggregation
+uses a deterministic metadata-hash identity and reports the unavailable behavioral signals as
+missing rather than guessing them.
 
 Spotify's current documentation describes Extended Streaming History as lifetime account activity
 with UTC timestamps, milliseconds played, track/artist/album names, Spotify track URIs,
