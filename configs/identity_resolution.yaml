@@ -1,0 +1,10 @@
+schema_version: 1
+
+identity_resolution:
+  policy_version: offline_spotify_account_catalog_v1
+  title_artist_exact_confidence: 0.90
+  fuzzy_title_threshold: 0.86
+  fuzzy_album_weight: 0.15
+  fuzzy_min_margin: 0.04
+  max_candidates: 5
+  review_sample_per_status: 20

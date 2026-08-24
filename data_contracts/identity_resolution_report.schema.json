@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/identity-resolution-report-v1.json",
+  "title": "Aggregate identity-resolution quality report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "catalog_source_files",
+    "catalog_records_seen",
+    "catalog_duplicates_removed",
+    "catalog_unique_tracks",
+    "queries_seen",
+    "resolved_count",
+    "history_play_count",
+    "resolved_play_count",
+    "resolved_play_rate",
+    "history_ms_played",
+    "resolved_ms_played",
+    "resolved_ms_played_rate",
+    "review_required_count",
+    "status_counts",
+    "status_rates",
+    "method_counts",
+    "policy_version"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "catalog_source_files": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "catalog_records_seen": { "type": "integer", "minimum": 0 },
+    "catalog_duplicates_removed": { "type": "integer", "minimum": 0 },
+    "catalog_unique_tracks": { "type": "integer", "minimum": 0 },
+    "queries_seen": { "type": "integer", "minimum": 1 },
+    "resolved_count": { "type": "integer", "minimum": 0 },
+    "history_play_count": { "type": "integer", "minimum": 1 },
+    "resolved_play_count": { "type": "integer", "minimum": 0 },
+    "resolved_play_rate": { "$ref": "#/$defs/rate" },
+    "history_ms_played": { "type": "integer", "minimum": 0 },
+    "resolved_ms_played": { "type": "integer", "minimum": 0 },
+    "resolved_ms_played_rate": { "$ref": "#/$defs/rate" },
+    "review_required_count": { "type": "integer", "minimum": 0 },
+    "status_counts": { "$ref": "#/$defs/statusCounts" },
+    "status_rates": { "$ref": "#/$defs/statusRates" },
+    "method_counts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "policy_version": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "statusCounts": {
+      "type": "object",
+      "required": ["exact", "fuzzy", "ambiguous", "unmatched"],
+      "properties": {
+        "exact": { "type": "integer", "minimum": 0 },
+        "fuzzy": { "type": "integer", "minimum": 0 },
+        "ambiguous": { "type": "integer", "minimum": 0 },
+        "unmatched": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "statusRates": {
+      "type": "object",
+      "required": ["exact", "fuzzy", "ambiguous", "unmatched"],
+      "properties": {
+        "exact": { "$ref": "#/$defs/rate" },
+        "fuzzy": { "$ref": "#/$defs/rate" },
+        "ambiguous": { "$ref": "#/$defs/rate" },
+        "unmatched": { "$ref": "#/$defs/rate" }
+      },
+      "additionalProperties": false
+    },
+    "rate": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": false
+}

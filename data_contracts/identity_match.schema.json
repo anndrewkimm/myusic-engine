@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/identity-match-v1.json",
+  "title": "Reviewable track identity match",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_track_id",
+    "source_identity_source",
+    "track_name",
+    "artist_name",
+    "album_name",
+    "match_status",
+    "resolved_track_id",
+    "match_method",
+    "match_confidence",
+    "review_required",
+    "candidates",
+    "policy_version"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_track_id": { "type": "string", "minLength": 1 },
+    "source_identity_source": { "enum": ["spotify_uri", "metadata_hash"] },
+    "track_name": { "type": ["string", "null"] },
+    "artist_name": { "type": ["string", "null"] },
+    "album_name": { "type": ["string", "null"] },
+    "match_status": { "enum": ["exact", "fuzzy", "ambiguous", "unmatched"] },
+    "resolved_track_id": { "type": ["string", "null"], "minLength": 1 },
+    "match_method": {
+      "enum": [
+        "existing_spotify_uri",
+        "exact_title_artist_album",
+        "exact_title_artist",
+        "fuzzy_title_exact_artist",
+        "none"
+      ]
+    },
+    "match_confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "review_required": { "type": "boolean" },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "policy_version": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": [
+        "track_uri",
+        "track_name",
+        "artist_name",
+        "album_name",
+        "similarity_score",
+        "catalog_source"
+      ],
+      "properties": {
+        "track_uri": {
+          "type": "string",
+          "pattern": "^spotify:track:[A-Za-z0-9]{22}$"
+        },
+        "track_name": { "type": "string", "minLength": 1 },
+        "artist_name": { "type": "string", "minLength": 1 },
+        "album_name": { "type": ["string", "null"] },
+        "similarity_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "catalog_source": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

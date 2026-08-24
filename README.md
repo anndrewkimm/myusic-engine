@@ -29,9 +29,10 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 
 The pending Extended export is not needed for the test suite. Phase 1 has been validated against
 the compact Account Data format, but still needs Extended-history validation and private EDA.
-Phase 2 identity resolution is unstarted. Phase 3 now has a tested foundation, but its exit
-criterion still requires transformation tests and quality evaluation on a permitted real music
-corpus. See [current project status](docs/project-status.md).
+Phase 2 now has an offline account-catalog resolver; external provider coverage and manual match
+validation remain. Phase 3 has a tested foundation, but its exit criterion still requires
+transformation tests and quality evaluation on a permitted real music corpus. See
+[current project status](docs/project-status.md).
 
 ## Development setup
 
@@ -84,6 +85,24 @@ compact Account Data `StreamingHistory_music_*` / `StreamingHistory_podcast_*` f
 accepted. Compact Account Data does not include Spotify URIs or the richer playback signals, so
 its track identities fall back to deterministic metadata hashes. The detailed handoff and
 validation checklist is in [Spotify export handoff](docs/spotify-export-handoff.md).
+
+## Resolve metadata-only track identities
+
+The compact Account Data ZIP includes Spotify URIs for saved and playlist tracks even though its
+streaming-history rows do not. Resolve safe exact matches locally and produce explicit fuzzy,
+ambiguous, and unmatched queues:
+
+```powershell
+python -m myusic_engine resolve-identities `
+  "data/processed/history/user_track_affinity.jsonl" `
+  "data/private/my_spotify_data.zip" `
+  --output-dir "data/interim/identity" `
+  --matching-config "configs/identity_resolution.yaml"
+```
+
+Exact unique matches receive a stable URI. Fuzzy and ambiguous candidates remain unresolved and
+reviewable; the resolver never silently promotes them to ground truth. See
+[offline identity resolution](docs/identity-resolution.md) for the policy and output contracts.
 
 ## Analyze permitted audio
 

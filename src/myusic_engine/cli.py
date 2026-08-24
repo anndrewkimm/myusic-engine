@@ -8,6 +8,15 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from myusic_engine.ingest import HistoryIngestionError, prepare_history
+from myusic_engine.matching import (
+    IdentityPolicy,
+    IdentityResolutionError,
+    load_account_catalog,
+    load_identity_policy,
+    read_track_queries,
+    resolve_identities,
+    write_identity_resolution,
+)
 from myusic_engine.ranking import (
     AffinityConfig,
     BehaviorAggregationError,
@@ -50,6 +59,32 @@ def _parser() -> argparse.ArgumentParser:
         "--duration-map",
         type=Path,
         help="Optional JSON object mapping track URIs to duration milliseconds",
+    )
+
+    identity_parser = subparsers.add_parser(
+        "resolve-identities",
+        help="Resolve history tracks against URI-bearing local Spotify account metadata.",
+    )
+    identity_parser.add_argument(
+        "affinities",
+        type=Path,
+        help="Private user_track_affinity.jsonl produced by prepare-history",
+    )
+    identity_parser.add_argument(
+        "account_data",
+        type=Path,
+        help="Private Spotify ZIP or directory containing YourLibrary and Playlist JSON",
+    )
+    identity_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Ignored local directory for matches, coverage report, and review sample",
+    )
+    identity_parser.add_argument(
+        "--matching-config",
+        type=Path,
+        help="Optional versioned identity-resolution YAML; safe defaults are used when omitted",
     )
 
     audio_parser = subparsers.add_parser(
@@ -166,6 +201,41 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(f"Aggregated {len(affinities)} track affinity records.")
         print(f"Wrote privacy-cleaned output to {args.output_dir}")
+        return 0
+    if args.command == "resolve-identities":
+        try:
+            policy = (
+                load_identity_policy(args.matching_config)
+                if args.matching_config
+                else IdentityPolicy()
+            )
+            queries = read_track_queries(args.affinities)
+            catalog = load_account_catalog(args.account_data)
+            identity_result = resolve_identities(queries, catalog, policy=policy)
+            write_identity_resolution(
+                identity_result,
+                args.output_dir,
+                review_sample_per_status=policy.review_sample_per_status,
+            )
+        except (IdentityResolutionError, OSError) as exc:
+            print(f"Identity resolution failed: {exc}", file=sys.stderr)
+            return 2
+        counts = identity_result.report.status_counts
+        print(
+            f"Resolved {identity_result.report.resolved_count} of "
+            f"{identity_result.report.queries_seen} tracks; "
+            f"{counts['fuzzy']} fuzzy, {counts['ambiguous']} ambiguous, "
+            f"{counts['unmatched']} unmatched."
+        )
+        print(
+            f"Exact IDs cover {identity_result.report.resolved_play_rate:.1%} of plays and "
+            f"{identity_result.report.resolved_ms_played_rate:.1%} of listening time."
+        )
+        print(
+            f"Catalog contained {identity_result.report.catalog_unique_tracks} unique Spotify "
+            f"tracks from {len(identity_result.report.catalog_source_files)} local account files."
+        )
+        print(f"Wrote private identity outputs to {args.output_dir}")
         return 0
     if args.command == "download-embedding-model":
         from myusic_engine.embeddings import EmbeddingExtractionError, download_model
