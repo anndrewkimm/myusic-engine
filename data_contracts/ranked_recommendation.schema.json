@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/ranked-recommendation-v1.json",
+  "title": "Explainable ranked recommendation",
+  "type": "object",
+  "required": [
+    "schema_version", "run_id", "rank", "track_id", "spotify_uri", "track_name",
+    "artist_name", "album_name", "ranking_tier", "final_score", "score_components",
+    "model_explanations", "cluster_context", "exclusion_reason"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "rank": { "type": ["integer", "null"], "minimum": 1 },
+    "track_id": { "type": "string", "minLength": 1 },
+    "spotify_uri": { "type": ["string", "null"] },
+    "track_name": { "type": ["string", "null"] },
+    "artist_name": { "type": ["string", "null"] },
+    "album_name": { "type": ["string", "null"] },
+    "ranking_tier": { "enum": ["audio_ranked", "preference_ranked", "metadata_only"] },
+    "final_score": { "type": ["number", "null"] },
+    "score_components": { "type": "object" },
+    "model_explanations": { "type": "array", "items": { "type": "object" } },
+    "cluster_context": { "type": ["object", "null"] },
+    "exclusion_reason": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

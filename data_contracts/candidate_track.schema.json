@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/candidate-track-v1.json",
+  "title": "Candidate track intake",
+  "type": "object",
+  "anyOf": [
+    { "required": ["track_id"] },
+    { "required": ["spotify_uri"] },
+    { "required": ["uri"] },
+    { "required": ["url"] }
+  ],
+  "properties": {
+    "track_id": { "type": "string", "minLength": 1 },
+    "spotify_uri": { "type": ["string", "null"] },
+    "uri": { "type": ["string", "null"] },
+    "url": { "type": ["string", "null"] },
+    "track_name": { "type": ["string", "null"] },
+    "title": { "type": ["string", "null"] },
+    "artist_name": { "type": ["string", "null"] },
+    "artist": { "type": ["string", "null"] },
+    "album_name": { "type": ["string", "null"] },
+    "album": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

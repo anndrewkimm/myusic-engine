@@ -33,6 +33,8 @@ ranking:
   predicted_preference_weight: 0.35
   novelty_bonus_weight: 0.15
   artist_repetition_penalty: 0.10
+  maximum_per_artist: 3
+  explanation_feature_count: 5
 
 retrieval:
   metric: cosine
