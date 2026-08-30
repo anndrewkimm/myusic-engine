@@ -134,9 +134,7 @@ def _measurement_confidence(coverage_seconds: float, *, ceiling: float) -> float
     return round(ceiling * coverage_factor, 6)
 
 
-def _positive_score(
-    document: Mapping[str, object], task: str, positive_class: str
-) -> float | None:
+def _positive_score(document: Mapping[str, object], task: str, positive_class: str) -> float | None:
     value = _finite_number(
         _nested(document, f"highlevel.{task}.all.{positive_class}"),
         f"highlevel.{task}.all.{positive_class}",

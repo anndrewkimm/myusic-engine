@@ -213,16 +213,13 @@ def test_acousticbrainz_conversion_is_source_tagged_and_reports_missing_coverage
     assert result.report.low_level_tracks_covered == 1
     assert result.report.low_level_play_rate == 0.9
     assert result.report.high_level_tracks_covered == 1
-    assert {observation.track_id for observation in result.observations} == {
-        "spotify:track:1"
-    }
+    assert {observation.track_id for observation in result.observations} == {"spotify:track:1"}
     feature_names = {observation.feature_name for observation in result.observations}
     assert "tempo_bpm_estimate_v1" in feature_names
     assert "acousticbrainz_descriptor_vector_v1" in feature_names
     assert "acousticbrainz_learned_audio_vector_v1" in feature_names
     assert all(
-        observation.feature_source == "acousticbrainz_cc0"
-        for observation in result.observations
+        observation.feature_source == "acousticbrainz_cc0" for observation in result.observations
     )
 
     features_path, report_path = write_acousticbrainz_result(result, tmp_path / "features")

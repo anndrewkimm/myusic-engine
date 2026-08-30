@@ -36,15 +36,11 @@ def _selected_values(
             return None
         if spec.dimensions == 1:
             if not isinstance(observation.value, float):
-                raise RepresentationError(
-                    f"Selected scalar {spec.selector.label} is not numeric"
-                )
+                raise RepresentationError(f"Selected scalar {spec.selector.label} is not numeric")
             selected: tuple[float, ...] = (observation.value,)
         else:
             if not isinstance(observation.value, tuple):
-                raise RepresentationError(
-                    f"Selected vector {spec.selector.label} is not a vector"
-                )
+                raise RepresentationError(f"Selected vector {spec.selector.label} is not a vector")
             if len(observation.value) != spec.dimensions:
                 raise RepresentationError(
                     f"Selected vector {spec.selector.label} has unexpected dimensions"
@@ -72,9 +68,7 @@ class ProfiledFeatureCatalog:
         self.profile = profile
         self._track_ids = frozenset(record.track_id for record in records)
         self._representations: dict[str, TrackAudioRepresentation] = {}
-        embedding_specs = (
-            (profile.embedding_input,) if profile.embedding_input is not None else ()
-        )
+        embedding_specs = (profile.embedding_input,) if profile.embedding_input is not None else ()
         for track_id in sorted(self._track_ids):
             descriptors = (
                 _selected_values(
@@ -104,11 +98,7 @@ class ProfiledFeatureCatalog:
 
     @property
     def descriptor_feature_names(self) -> tuple[str, ...]:
-        return tuple(
-            name
-            for spec in self.profile.descriptor_inputs
-            for name in spec.feature_names
-        )
+        return tuple(name for spec in self.profile.descriptor_inputs for name in spec.feature_names)
 
     @property
     def embedding_feature_names(self) -> tuple[str, ...]:

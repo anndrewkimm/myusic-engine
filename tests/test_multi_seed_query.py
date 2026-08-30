@@ -12,7 +12,6 @@ from myusic_engine.ranking import (
     weighted_query_embedding,
 )
 
-
 EMBEDDING_SELECTOR = FeatureSelector(
     feature_name="discogs_effnet_embedding_v1",
     feature_source="essentia",
@@ -120,9 +119,7 @@ def test_numeric_and_categorical_filters_use_exact_provenance() -> None:
         CategoricalFilter(MODE_SELECTOR, frozenset({"MAJOR"})),
     )
 
-    matches = _index(features=features).query(
-        {"seed-a": 1.0, "seed-b": 1.0}, filters=filters
-    )
+    matches = _index(features=features).query({"seed-a": 1.0, "seed-b": 1.0}, filters=filters)
 
     assert [match.track_id for match in matches] == ["balanced"]
     assert [item.value for item in matches[0].filter_evidence] == [122.0, "major"]
@@ -172,9 +169,7 @@ def test_embedding_and_filter_confidence_floors_are_enforced() -> None:
         ({"seed-a": 0.0}, "positive"),
     ],
 )
-def test_invalid_seed_queries_are_rejected(
-    seed_weights: dict[str, float], message: str
-) -> None:
+def test_invalid_seed_queries_are_rejected(seed_weights: dict[str, float], message: str) -> None:
     with pytest.raises(SimilarityError, match=message):
         _index().query(seed_weights)
 

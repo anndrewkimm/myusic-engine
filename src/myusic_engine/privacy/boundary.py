@@ -2,7 +2,6 @@
 
 from collections.abc import Mapping, Sequence
 
-
 SENSITIVE_RAW_FIELDS = frozenset(
     {
         "address",

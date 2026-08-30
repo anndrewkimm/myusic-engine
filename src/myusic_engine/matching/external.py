@@ -289,9 +289,7 @@ def _match_query(
             mapped_release_name=None,
             review_required=True,
         )
-    title_exact = normalize_metadata(query.track_name) == normalize_metadata(
-        mapping.recording_name
-    )
+    title_exact = normalize_metadata(query.track_name) == normalize_metadata(mapping.recording_name)
     artist_exact = normalize_metadata(query.artist_name) == normalize_metadata(
         mapping.artist_credit_name
     )
@@ -441,9 +439,7 @@ def external_review_sample(
 
 
 def _json_lines(matches: Iterable[ExternalIdentityMatch]) -> str:
-    rows = [
-        json.dumps(match.to_dict(), ensure_ascii=False, sort_keys=True) for match in matches
-    ]
+    rows = [json.dumps(match.to_dict(), ensure_ascii=False, sort_keys=True) for match in matches]
     return "\n".join(rows) + ("\n" if rows else "")
 
 
@@ -464,9 +460,7 @@ def write_external_identity_resolution(
     review_path = atomic_write_text(
         destination / "external_identity_review_sample.jsonl",
         _json_lines(
-            external_review_sample(
-                result.matches, sample_size_per_status=review_sample_per_status
-            )
+            external_review_sample(result.matches, sample_size_per_status=review_sample_per_status)
         ),
     )
     return matches_path, report_path, review_path
@@ -485,10 +479,6 @@ def read_external_identity_matches(path: str | Path) -> tuple[ExternalIdentityMa
                     f"External identity line {line_number} is not valid JSON"
                 ) from exc
             if not isinstance(payload, Mapping):
-                raise IdentityInputError(
-                    f"External identity line {line_number} must be an object"
-                )
-            matches.append(
-                ExternalIdentityMatch.from_dict(cast(Mapping[str, object], payload))
-            )
+                raise IdentityInputError(f"External identity line {line_number} must be an object")
+            matches.append(ExternalIdentityMatch.from_dict(cast(Mapping[str, object], payload)))
     return tuple(matches)

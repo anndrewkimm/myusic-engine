@@ -57,12 +57,7 @@ class LinearTasteModel:
         dimensions = len(self.feature_names)
         if self.schema_version != 1 or dimensions < 1:
             raise TasteTrainingError("Taste model schema or feature list is invalid")
-        if not (
-            len(self.means)
-            == len(self.scales)
-            == len(self.coefficients)
-            == dimensions
-        ):
+        if not (len(self.means) == len(self.scales) == len(self.coefficients) == dimensions):
             raise TasteTrainingError("Taste model parameter dimensions do not align")
         values = (*self.means, *self.scales, *self.coefficients, self.intercept)
         if any(not math.isfinite(value) for value in values):
@@ -191,9 +186,7 @@ class VariantEvaluation:
             "cohort": self.cohort,
             "split_rows": dict(sorted(self.split_rows.items())),
             "validation_metrics": (
-                self.validation_metrics.to_dict()
-                if self.validation_metrics is not None
-                else None
+                self.validation_metrics.to_dict() if self.validation_metrics is not None else None
             ),
             "test_metrics": (
                 self.test_metrics.to_dict() if self.test_metrics is not None else None
@@ -300,9 +293,7 @@ def _variant_specs(has_descriptors: bool, has_embedding: bool) -> tuple[_Variant
     return tuple(specs)
 
 
-def _feature_names(
-    spec: _VariantSpec, catalog: ProfiledFeatureCatalog | None
-) -> tuple[str, ...]:
+def _feature_names(spec: _VariantSpec, catalog: ProfiledFeatureCatalog | None) -> tuple[str, ...]:
     names = tuple(f"behavior:{BEHAVIOR_FEATURE_NAMES[index]}" for index in spec.behavior_indices)
     if spec.include_descriptors:
         assert catalog is not None
@@ -392,9 +383,7 @@ def _fit_variant(
     split_rows = {split: counts[split] for split in ("train", "validation", "test")}
     feature_names = _feature_names(spec, catalog)
     train_rows = [(sample, row) for sample, row in selected if sample.split == "train"]
-    validation_rows = [
-        (sample, row) for sample, row in selected if sample.split == "validation"
-    ]
+    validation_rows = [(sample, row) for sample, row in selected if sample.split == "validation"]
     test_rows = [(sample, row) for sample, row in selected if sample.split == "test"]
     reason: str | None = None
     if not feature_names:
@@ -419,9 +408,7 @@ def _fit_variant(
 
     train_x = np.asarray([row for _, row in train_rows], dtype=np.float64)
     train_y = np.asarray([sample.label for sample, _ in train_rows], dtype=np.int64)
-    train_weight = np.asarray(
-        [sample.sample_weight for sample, _ in train_rows], dtype=np.float64
-    )
+    train_weight = np.asarray([sample.sample_weight for sample, _ in train_rows], dtype=np.float64)
     scaler = StandardScaler()
     scaled_train = scaler.fit_transform(train_x, sample_weight=train_weight)
     estimator = LogisticRegression(
@@ -448,9 +435,7 @@ def _fit_variant(
         includes_behavior=bool(spec.behavior_indices),
         includes_descriptors=spec.include_descriptors,
         includes_embedding=spec.include_embedding,
-        profile_name=(
-            profile_name if spec.include_descriptors or spec.include_embedding else None
-        ),
+        profile_name=(profile_name if spec.include_descriptors or spec.include_embedding else None),
         profile_version=(
             profile_version if spec.include_descriptors or spec.include_embedding else None
         ),
@@ -463,9 +448,7 @@ def _fit_variant(
 
     predictions: list[TastePrediction] = []
 
-    def evaluate(
-        rows: list[tuple[TemporalTasteSample, tuple[float, ...]]]
-    ) -> PredictionMetrics:
+    def evaluate(rows: list[tuple[TemporalTasteSample, tuple[float, ...]]]) -> PredictionMetrics:
         probabilities = [model.predict_probability(row) for _, row in rows]
         for (sample, _), probability in zip(rows, probabilities, strict=True):
             predictions.append(
@@ -533,11 +516,7 @@ def train_taste_models(
     active = config or TasteModelConfig()
     if (profile is None) != (profile_name is None):
         raise TasteTrainingError("Audio profile and profile_name must be supplied together")
-    catalog = (
-        ProfiledFeatureCatalog(feature_observations, profile)
-        if profile is not None
-        else None
-    )
+    catalog = ProfiledFeatureCatalog(feature_observations, profile) if profile is not None else None
     specs = _variant_specs(
         bool(profile and profile.descriptor_inputs),
         bool(profile and profile.embedding_input),
@@ -583,9 +562,7 @@ def train_taste_models(
         variants=tuple(evaluations),
     )
     assert_privacy_safe(report.to_dict())
-    return TasteTrainingResult(
-        models=tuple(models), predictions=tuple(predictions), report=report
-    )
+    return TasteTrainingResult(models=tuple(models), predictions=tuple(predictions), report=report)
 
 
 def _float_tuple(value: object, label: str) -> tuple[float, ...]:

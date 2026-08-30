@@ -37,9 +37,7 @@ class TemporalConfig:
     intentional_start_reasons: frozenset[str] = frozenset(
         {"backbtn", "clickrow", "fwdbtn", "playbtn", "remote"}
     )
-    passive_start_reasons: frozenset[str] = frozenset(
-        {"appload", "autoplay", "trackdone"}
-    )
+    passive_start_reasons: frozenset[str] = frozenset({"appload", "autoplay", "trackdone"})
 
     def __post_init__(self) -> None:
         if not self.dataset_version.strip():
@@ -173,9 +171,7 @@ def _text(section: Mapping[str, object], key: str, default: str) -> str:
     return value.strip()
 
 
-def _reason_set(
-    section: Mapping[str, object], key: str, default: frozenset[str]
-) -> frozenset[str]:
+def _reason_set(section: Mapping[str, object], key: str, default: frozenset[str]) -> frozenset[str]:
     value = section.get(key)
     if value is None:
         return default
@@ -272,14 +268,10 @@ def load_modeling_config(path: str | Path) -> ModelingConfig:
     }
     unknown_temporal = set(temporal_section) - allowed_temporal
     if unknown_temporal:
-        raise ModelingConfigError(
-            f"Unknown temporal fields: {', '.join(sorted(unknown_temporal))}"
-        )
+        raise ModelingConfigError(f"Unknown temporal fields: {', '.join(sorted(unknown_temporal))}")
     defaults = TemporalConfig()
     temporal = TemporalConfig(
-        dataset_version=_text(
-            temporal_section, "dataset_version", defaults.dataset_version
-        ),
+        dataset_version=_text(temporal_section, "dataset_version", defaults.dataset_version),
         period_days=_integer(temporal_section, "period_days", defaults.period_days),
         validation_fraction=_number(
             temporal_section, "validation_fraction", defaults.validation_fraction

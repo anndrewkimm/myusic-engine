@@ -1,7 +1,7 @@
 import json
 import math
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -16,7 +16,6 @@ from myusic_engine.ranking import (
     score_affinity,
     write_track_affinities,
 )
-
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "spotify_history_synthetic.json"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -70,9 +69,7 @@ def test_duration_metadata_enables_completion_ratios() -> None:
 
 def test_missing_behavior_signals_remain_null_and_reduce_confidence() -> None:
     event = next(
-        event
-        for event in load_history(FIXTURE_PATH).events
-        if event.track_uri == FIRST_TRACK_URI
+        event for event in load_history(FIXTURE_PATH).events if event.track_uri == FIRST_TRACK_URI
     )
     unknown_signals = replace(event, reason_start=None, reason_end=None, skipped=None)
 
@@ -88,9 +85,7 @@ def test_missing_behavior_signals_remain_null_and_reduce_confidence() -> None:
 
 def test_repeat_rate_resets_after_the_session_gap() -> None:
     base = next(
-        event
-        for event in load_history(FIXTURE_PATH).events
-        if event.track_uri == FIRST_TRACK_URI
+        event for event in load_history(FIXTURE_PATH).events if event.track_uri == FIRST_TRACK_URI
     )
     events = [
         replace(base, event_id="a" * 64, played_at="2025-01-01T10:00:00.000Z"),
@@ -134,7 +129,7 @@ def test_as_of_must_not_precede_the_latest_event() -> None:
     with pytest.raises(BehaviorAggregationError, match="latest event"):
         aggregate_track_behavior(
             events,
-            as_of=datetime(2024, 12, 31, tzinfo=timezone.utc),
+            as_of=datetime(2024, 12, 31, tzinfo=UTC),
         )
 
 

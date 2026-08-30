@@ -6,7 +6,6 @@ import pytest
 from myusic_engine.ingest import HistoryRecordError, normalize_history_record
 from myusic_engine.privacy import PrivacyBoundaryError, assert_privacy_safe, find_sensitive_fields
 
-
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "spotify_history_synthetic.json"
 
 

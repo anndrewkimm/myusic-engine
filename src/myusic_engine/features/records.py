@@ -13,7 +13,6 @@ from typing import TypeAlias, cast
 from myusic_engine.io import atomic_write_text
 from myusic_engine.privacy import assert_privacy_safe
 
-
 FeatureValue: TypeAlias = float | str | tuple[float, ...]
 _FEATURE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*_v[0-9]+$")
 _VALUE_FIELDS = frozenset({"value_number", "value_text", "value_vector"})

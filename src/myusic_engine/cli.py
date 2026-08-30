@@ -327,9 +327,7 @@ def _parser() -> argparse.ArgumentParser:
     audio_parser.add_argument(
         "--feature-head-model-dir",
         type=Path,
-        help=(
-            "Optional pinned Essentia classifier-head directory; enables learned audio scores"
-        ),
+        help=("Optional pinned Essentia classifier-head directory; enables learned audio scores"),
     )
     audio_parser.add_argument(
         "--window-output-dir",
@@ -617,9 +615,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 config=modeling_config.model,
                 feature_observations=feature_observations,
                 profile=(
-                    modeling_config.profiles[args.profile]
-                    if args.profile is not None
-                    else None
+                    modeling_config.profiles[args.profile] if args.profile is not None else None
                 ),
                 profile_name=args.profile,
             )

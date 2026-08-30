@@ -200,8 +200,7 @@ class TasteMapReport:
             "selected_cluster_count": self.selected_cluster_count,
             "selected_noise_rate": self.selected_noise_rate,
             "cluster_sizes": {
-                str(cluster_id): count
-                for cluster_id, count in sorted(self.cluster_sizes.items())
+                str(cluster_id): count for cluster_id, count in sorted(self.cluster_sizes.items())
             },
             "model_id": self.model_id,
             "experiments": [experiment.to_dict() for experiment in self.experiments],
@@ -353,9 +352,7 @@ def build_taste_map(
             continue
         estimator = HDBSCAN(min_cluster_size=minimum_cluster_size, copy=False)
         labels = estimator.fit_predict(standardized)
-        cluster_count, noise_rate, silhouette, davies = _cluster_metrics(
-            standardized, labels
-        )
+        cluster_count, noise_rate, silhouette, davies = _cluster_metrics(standardized, labels)
         eligible_for_selection = (
             silhouette is not None
             and noise_rate <= active.maximum_hdbscan_noise_rate
@@ -465,9 +462,7 @@ def build_taste_map(
     return TasteMapResult(assignments=tuple(assignments), model=model, report=report)
 
 
-def write_taste_map(
-    result: TasteMapResult, output_dir: str | Path
-) -> tuple[Path, Path, Path]:
+def write_taste_map(result: TasteMapResult, output_dir: str | Path) -> tuple[Path, Path, Path]:
     """Write private assignments plus reproducible model and aggregate report."""
 
     destination = Path(output_dir)
@@ -528,9 +523,7 @@ def read_taste_map_assignments(path: str | Path) -> tuple[TasteMapAssignment, ..
                     f"Taste-map assignment line {line_number} is not valid JSON"
                 ) from exc
             if not isinstance(payload, Mapping):
-                raise TasteMapError(
-                    f"Taste-map assignment line {line_number} must be an object"
-                )
+                raise TasteMapError(f"Taste-map assignment line {line_number} must be an object")
             record = cast(Mapping[str, object], payload)
             if record.get("schema_version") != 1:
                 raise TasteMapError("Taste-map assignment schema_version must be 1")

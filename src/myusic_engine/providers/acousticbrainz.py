@@ -91,9 +91,7 @@ class AcousticBrainzClient:
         }
 
     @classmethod
-    def _documents(
-        cls, payload: object | None, label: str
-    ) -> dict[str, Mapping[str, object]]:
+    def _documents(cls, payload: object | None, label: str) -> dict[str, Mapping[str, object]]:
         if payload is None:
             return {}
         if not isinstance(payload, Mapping):
@@ -108,9 +106,7 @@ class AcousticBrainzClient:
             offsets = cast(Mapping[str, object], raw_offsets)
             raw_document = offsets.get("0")
             if raw_document is None and offsets:
-                numeric_keys = sorted(
-                    (str(key) for key in offsets if str(key).isdigit()), key=int
-                )
+                numeric_keys = sorted((str(key) for key in offsets if str(key).isdigit()), key=int)
                 raw_document = offsets.get(numeric_keys[0]) if numeric_keys else None
             if raw_document is None:
                 continue

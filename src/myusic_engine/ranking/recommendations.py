@@ -104,9 +104,7 @@ def load_recommendation_config(path: str | Path) -> RecommendationConfig:
         return value
 
     return RecommendationConfig(
-        audio_similarity_weight=number(
-            "audio_similarity_weight", defaults.audio_similarity_weight
-        ),
+        audio_similarity_weight=number("audio_similarity_weight", defaults.audio_similarity_weight),
         predicted_preference_weight=number(
             "predicted_preference_weight", defaults.predicted_preference_weight
         ),
@@ -339,10 +337,7 @@ def rank_candidates(
     if (
         model is not None
         and (model.includes_descriptors or model.includes_embedding)
-        and (
-            model.profile_name != profile_name
-            or model.profile_version != profile.profile_version
-        )
+        and (model.profile_name != profile_name or model.profile_version != profile.profile_version)
     ):
         raise RecommendationError("Taste model and selected audio profile do not match")
     query_vector: tuple[float, ...] | None = None
@@ -359,9 +354,7 @@ def rank_candidates(
     if len(snapshot_by_track) != len(snapshots):
         raise RecommendationError("Behavior snapshots contain duplicate track IDs")
     snapshot_by_artist = {
-        snapshot.artist_key: snapshot
-        for snapshot in snapshots
-        if snapshot.artist_key is not None
+        snapshot.artist_key: snapshot for snapshot in snapshots if snapshot.artist_key is not None
     }
     assignment_rows = tuple(cluster_assignments)
     assignment_by_track = {assignment.track_id: assignment for assignment in assignment_rows}
@@ -388,9 +381,7 @@ def rank_candidates(
     )
     scored: list[_ScoredCandidate] = []
     for candidate in candidate_rows:
-        behavior = _behavior_for_candidate(
-            candidate, snapshot_by_track, snapshot_by_artist
-        )
+        behavior = _behavior_for_candidate(candidate, snapshot_by_track, snapshot_by_artist)
         novelty = _novelty(behavior)
         representation = catalog.get(candidate.track_id)
         similarity = None
@@ -406,18 +397,14 @@ def rank_candidates(
                     1.0,
                     math.fsum(
                         left * right
-                        for left, right in zip(
-                            query_vector, candidate_vector, strict=True
-                        )
+                        for left, right in zip(query_vector, candidate_vector, strict=True)
                     ),
                 ),
             )
         preference = None
         explanations: tuple[tuple[str, float], ...] = ()
         if model is not None:
-            model_values = model_input_vector(
-                model, behavior, catalog, candidate.track_id
-            )
+            model_values = model_input_vector(model, behavior, catalog, candidate.track_id)
             if model_values is not None:
                 preference = model.predict_probability(model_values)
                 explanations = tuple(
@@ -541,14 +528,10 @@ def rank_candidates(
             artist_repetition_penalty=0.0,
             model_explanations=item.explanations,
             cluster_id=(
-                item.cluster_assignment.cluster_id
-                if item.cluster_assignment is not None
-                else None
+                item.cluster_assignment.cluster_id if item.cluster_assignment is not None else None
             ),
             cluster_is_noise=(
-                item.cluster_assignment.is_noise
-                if item.cluster_assignment is not None
-                else None
+                item.cluster_assignment.is_noise if item.cluster_assignment is not None else None
             ),
             cluster_confidence=(
                 item.cluster_assignment.cluster_confidence
@@ -556,9 +539,7 @@ def rank_candidates(
                 else None
             ),
             cluster_model_id=(
-                item.cluster_assignment.model_id
-                if item.cluster_assignment is not None
-                else None
+                item.cluster_assignment.model_id if item.cluster_assignment is not None else None
             ),
             exclusion_reason=(
                 item.exclusion_reason

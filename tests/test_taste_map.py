@@ -10,9 +10,7 @@ from myusic_engine.features import FeatureObservation, FeatureSelector
 from myusic_engine.modeling import AudioFeatureProfile, AudioInputSpec
 
 
-def test_taste_map_compares_cluster_families_and_writes_projection(
-    tmp_path, monkeypatch
-) -> None:
+def test_taste_map_compares_cluster_families_and_writes_projection(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("LOKY_MAX_CPU_COUNT", "1")
     descriptor = FeatureSelector("synthetic_descriptor_v1", "synthetic", "v1")
     embedding = FeatureSelector("synthetic_embedding_v1", "synthetic", "v1")

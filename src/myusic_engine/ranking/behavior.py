@@ -9,7 +9,7 @@ import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -165,9 +165,7 @@ def _integer(section: Mapping[str, object], key: str, default: int) -> int:
     return value
 
 
-def _reason_set(
-    section: Mapping[str, object], key: str, default: frozenset[str]
-) -> frozenset[str]:
+def _reason_set(section: Mapping[str, object], key: str, default: frozenset[str]) -> frozenset[str]:
     value = section.get(key)
     if value is None:
         return default
@@ -232,9 +230,7 @@ def load_affinity_config(path: str | Path) -> AffinityConfig:
         completion_threshold=_number(
             section, "completion_threshold", defaults.completion_threshold
         ),
-        session_gap_minutes=_integer(
-            section, "session_gap_minutes", defaults.session_gap_minutes
-        ),
+        session_gap_minutes=_integer(section, "session_gap_minutes", defaults.session_gap_minutes),
         complete_end_reasons=_reason_set(
             section, "complete_end_reasons", defaults.complete_end_reasons
         ),
@@ -279,11 +275,11 @@ def _parsed_timestamp(value: str) -> datetime:
         ) from exc
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise BehaviorAggregationError("Normalized event played_at must include a timezone")
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _timestamp_text(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _track_identity(event: NormalizedListeningEvent) -> tuple[str, str]:
@@ -311,9 +307,7 @@ def _known_completion(
     return None, None
 
 
-def _known_early_skip(
-    event: NormalizedListeningEvent, config: AffinityConfig
-) -> bool | None:
+def _known_early_skip(event: NormalizedListeningEvent, config: AffinityConfig) -> bool | None:
     reason_end = event.reason_end.casefold() if event.reason_end else None
     if event.skipped is True or reason_end in config.skip_end_reasons:
         return event.ms_played < config.early_skip_threshold_ms
@@ -378,8 +372,7 @@ def score_affinity(
     components = {
         "play_count": config.play_count_log_weight * math.log1p(play_count),
         "completion": config.completion_rate_weight * (completion_rate or 0.0),
-        "intentional_start": config.intentional_start_rate_weight
-        * (intentional_start_rate or 0.0),
+        "intentional_start": config.intentional_start_rate_weight * (intentional_start_rate or 0.0),
         "recency": config.recency_score_weight * recency_score,
         "early_skip": config.early_skip_rate_weight * (early_skip_rate or 0.0),
     }
@@ -405,9 +398,11 @@ def score_affinity(
     coverage_confidence = available_weight / coefficient_total if coefficient_total else 0.0
     sample_confidence = 1.0 - math.exp(-play_count / 3.0)
     confidence = coverage_confidence * sample_confidence
-    return _rounded(score), _rounded(confidence), {
-        name: _rounded(value) for name, value in components.items()
-    }
+    return (
+        _rounded(score),
+        _rounded(confidence),
+        {name: _rounded(value) for name, value in components.items()},
+    )
 
 
 def aggregate_track_behavior(
@@ -429,7 +424,7 @@ def aggregate_track_behavior(
     reference_time = as_of or latest_event_time
     if reference_time.tzinfo is None or reference_time.utcoffset() is None:
         raise BehaviorAggregationError("as_of must include a timezone")
-    reference_time = reference_time.astimezone(timezone.utc)
+    reference_time = reference_time.astimezone(UTC)
     if reference_time < latest_event_time:
         raise BehaviorAggregationError("as_of cannot be earlier than the latest event")
 
@@ -537,9 +532,7 @@ def aggregate_track_behavior(
             duration_ms=duration_ms,
             duration_coverage_rate=1.0 if duration_ms is not None else 0.0,
             median_completion_ratio=(
-                _rounded(float(statistics.median(completion_ratios)))
-                if completion_ratios
-                else None
+                _rounded(float(statistics.median(completion_ratios))) if completion_ratios else None
             ),
             completion_rate=_rounded(completion_rate) if completion_rate is not None else None,
             completion_signal_coverage=_rounded(completion_coverage),
@@ -563,9 +556,7 @@ def aggregate_track_behavior(
     return tuple(sorted(affinities, key=lambda item: (-item.affinity_score, item.track_id)))
 
 
-def write_track_affinities(
-    affinities: Iterable[TrackAffinity], output_path: str | Path
-) -> Path:
+def write_track_affinities(affinities: Iterable[TrackAffinity], output_path: str | Path) -> Path:
     """Atomically write one source-safe track-affinity JSON record per line."""
 
     serialized: list[str] = []

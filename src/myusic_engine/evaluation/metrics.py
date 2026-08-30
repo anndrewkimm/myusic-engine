@@ -86,9 +86,7 @@ def _ranking_metrics(
     ranking_k: int,
 ) -> tuple[int, float | None, float | None, float | None]:
     groups: dict[int, list[tuple[int, float]]] = defaultdict(list)
-    for label, probability, period_index in zip(
-        labels, probabilities, period_indices, strict=True
-    ):
+    for label, probability, period_index in zip(labels, probabilities, period_indices, strict=True):
         groups[period_index].append((label, probability))
     precision_values: list[float] = []
     recall_values: list[float] = []
@@ -103,9 +101,7 @@ def _ranking_metrics(
         hits = sum(label for label, _ in top)
         precision_values.append(hits / limit)
         recall_values.append(hits / positives)
-        dcg = math.fsum(
-            label / math.log2(rank + 2) for rank, (label, _) in enumerate(top)
-        )
+        dcg = math.fsum(label / math.log2(rank + 2) for rank, (label, _) in enumerate(top))
         ideal_hits = min(positives, limit)
         ideal = math.fsum(1.0 / math.log2(rank + 2) for rank in range(ideal_hits))
         ndcg_values.append(dcg / ideal if ideal else 0.0)

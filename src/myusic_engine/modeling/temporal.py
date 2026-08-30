@@ -102,9 +102,7 @@ class TemporalTasteSample:
             "sample_weight": self.sample_weight,
             "behavior_features": {
                 name: value
-                for name, value in zip(
-                    BEHAVIOR_FEATURE_NAMES, self.behavior_features, strict=True
-                )
+                for name, value in zip(BEHAVIOR_FEATURE_NAMES, self.behavior_features, strict=True)
             },
             "dataset_version": self.dataset_version,
         }
@@ -129,9 +127,7 @@ class BehaviorSnapshot:
             "as_of": self.as_of,
             "behavior_features": {
                 name: value
-                for name, value in zip(
-                    BEHAVIOR_FEATURE_NAMES, self.behavior_features, strict=True
-                )
+                for name, value in zip(BEHAVIOR_FEATURE_NAMES, self.behavior_features, strict=True)
             },
             "dataset_version": self.dataset_version,
         }
@@ -307,9 +303,7 @@ def _update_state(
         state.intentional_count += int(intentional)
 
 
-def _split_periods(
-    period_indices: list[int], config: TemporalConfig
-) -> dict[int, DatasetSplit]:
+def _split_periods(period_indices: list[int], config: TemporalConfig) -> dict[int, DatasetSplit]:
     ordered = sorted(set(period_indices))
     required = config.minimum_train_periods + 2
     if len(ordered) < required:
@@ -483,9 +477,7 @@ def build_temporal_dataset(
     if not pending_samples:
         raise TemporalDatasetError("History produced no decisive track-period labels")
 
-    split_by_period = _split_periods(
-        [sample.period_index for sample in pending_samples], active
-    )
+    split_by_period = _split_periods([sample.period_index for sample in pending_samples], active)
     samples: list[TemporalTasteSample] = []
     for pending in pending_samples:
         split = split_by_period[pending.period_index]
@@ -547,9 +539,7 @@ def build_temporal_dataset(
         periods_with_samples=len(split_by_period),
         split_period_counts={split: period_counts[split] for split in _SPLITS},
         sample_counts={split: sample_counts[split] for split in _SPLITS},
-        positive_sample_counts={
-            split: positive_counts[split] for split in _SPLITS
-        },
+        positive_sample_counts={split: positive_counts[split] for split in _SPLITS},
         abstained_track_periods=abstained_track_periods,
         unique_sample_tracks=len({sample.track_id for sample in samples}),
         snapshot_tracks=len(snapshots),

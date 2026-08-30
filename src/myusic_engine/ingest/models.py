@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-
 MediaType: TypeAlias = Literal["track", "episode", "unknown"]
 
 

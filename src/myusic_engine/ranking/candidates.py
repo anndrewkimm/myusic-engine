@@ -149,9 +149,7 @@ def read_candidates(path: str | Path) -> tuple[CandidateTrack, ...]:
                         f"Candidate line {line_number} is not valid JSON"
                     ) from exc
                 if not isinstance(payload, Mapping):
-                    raise CandidateInputError(
-                        f"Candidate line {line_number} must be an object"
-                    )
+                    raise CandidateInputError(f"Candidate line {line_number} must be an object")
                 records.append(cast(Mapping[str, object], payload))
     else:
         with source.open("r", encoding="utf-8-sig") as stream:

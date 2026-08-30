@@ -92,9 +92,7 @@ class ListenBrainzMappingClient:
         return ListenBrainzMapping(
             recording_mbid=self._text(raw_mbid, "recording_mbid"),
             recording_name=self._text(record.get("recording_name"), "recording_name"),
-            artist_credit_name=self._text(
-                record.get("artist_credit_name"), "artist_credit_name"
-            ),
+            artist_credit_name=self._text(record.get("artist_credit_name"), "artist_credit_name"),
             release_mbid=self._optional_text(record.get("release_mbid"), "release_mbid"),
             release_name=self._optional_text(record.get("release_name"), "release_name"),
             artist_mbids=artist_mbids,

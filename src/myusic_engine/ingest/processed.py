@@ -68,9 +68,7 @@ def _integer(record: Mapping[str, object], field_name: str) -> int:
 def _optional_boolean(record: Mapping[str, object], field_name: str) -> bool | None:
     value = record.get(field_name)
     if value is not None and not isinstance(value, bool):
-        raise ProcessedHistoryError(
-            f"Cleaned event field {field_name} must be null or boolean"
-        )
+        raise ProcessedHistoryError(f"Cleaned event field {field_name} must be null or boolean")
     return value
 
 
@@ -122,9 +120,7 @@ def iter_normalized_events(path: str | Path) -> Iterator[NormalizedListeningEven
                     f"Cleaned event line {line_number} is not valid JSON"
                 ) from exc
             if not isinstance(payload, Mapping):
-                raise ProcessedHistoryError(
-                    f"Cleaned event line {line_number} must be an object"
-                )
+                raise ProcessedHistoryError(f"Cleaned event line {line_number} must be an object")
             yield _event_from_record(cast(Mapping[str, object], payload))
 
 
