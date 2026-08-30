@@ -1,37 +1,58 @@
 # Current project status
 
-This status distinguishes implemented code from validation on inputs that have not arrived yet.
+This status separates implemented code, private validation already completed, and evidence that
+still requires an approved external service or permitted real audio.
 
 | Phase | Status | Evidence still needed |
 |---|---|---|
 | 0 — data-independent foundation | Complete | None for the synthetic foundation |
-| 1 — personal history foundation | Compact Account Data validated | Validate the Extended History ZIP for lifetime/URI-rich coverage and perform private EDA |
-| 2 — identity resolution | Offline account-catalog pass implemented | External metadata provider, review-sample validation, and unmatched-track coverage |
-| 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, transformation tests, pairwise sanity set, and retrieval-quality evaluation |
-| 4 — taste map and similarity | Retrieval primitive implemented early | Standardization, clustering experiments, real vectors, and cluster/retrieval evaluation |
-| 5+ | Not started | Requires stable representations and real behavioral labels |
+| 1 — personal history foundation | Complete — Extended History validated locally | Rerun only when a newer export is imported |
+| 2 — identity resolution | Offline resolver plus cached public-provider implementation | User-approved provider run, review-sample precision, and resulting coverage |
+| 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, pairwise sanity set, and retrieval-quality evaluation |
+| 4 — taste map and similarity | Standardized K-Means/HDBSCAN/PCA and retrieval implemented | Real lawful vectors and human retrieval sanity set |
+| 5 — personal preference ranker | Behavior baselines validated privately; audio ablations implemented | Lawful descriptor/embedding coverage and measured audio lift |
+| 6 — candidate intake/output | Local intake, explainable ranking, URI handoff, and feedback implemented | Real candidate features and explicit OAuth approval for live playlist mutation |
+
+Phase 1 validation read every discovered Extended History shard, rejected no malformed records,
+retained Spotify URI identities for all normalized tracks, confirmed the expected rich playback
+signals, and removed sensitive network fields from normalized output. Exact counts and listening
+patterns remain in ignored local reports and tables.
+
+Phase 2 now supports a precision-first public mapping route: title, artist, and optional album can
+be sent to the ListenBrainz mapper; only strict exact matches receive MusicBrainz recording IDs;
+fuzzy and unmatched responses remain review-only. Provider responses are cached and offline mode
+forbids cache misses. The live private-data run remains paused until the user explicitly approves
+sending that limited metadata.
 
 Phase 2 and phase 3 meet at `track_id`, but phase 3 can proceed independently. For a recording that
-already has a Spotify track URI, the private audio manifest can use that URI directly. For FMA,
-MusicBrainz, Discogs, or another lawful catalog, phase 2 must first decide which stable recording ID
-is being represented. Identity confidence must never be mixed into audio-feature confidence.
+already has a Spotify track URI, the private audio manifest can use that URI directly. For another
+lawful catalog, identity resolution must first decide which stable recording is represented.
+Identity confidence is never mixed into audio-feature confidence.
 
 The phase-3 foundation currently provides:
 
 - a rights-declared private audio manifest;
 - deterministic mono decoding and resampling;
-- 15–16 objective observations per analyzable track;
+- objective tempo, key, loudness, bass, spectral, chroma, and MFCC observations;
 - a pinned, SHA-256-verified Discogs-EffNet ONNX model;
 - six pinned, SHA-256-verified classifier heads for interpretable learned audio scores;
 - exact MusiCNN-style 16 kHz log-mel preprocessing;
 - retained overlapping window embeddings and learned score trajectories;
 - arithmetic-mean pooling followed by L2 normalization;
-- robust onset gating that abstains on stationary tones instead of inventing tempo;
-- direct compatibility with the existing 1,280-dimensional cosine index;
-- unit and synthetic transformation tests plus a real ONNX inference smoke test.
+- direct compatibility with the 1,280-dimensional cosine index;
+- synthetic transformation tests plus a real ONNX inference smoke test;
+- frozen CC0 AcousticBrainz low/high-level conversion for exact MusicBrainz matches.
 
-It deliberately does not emit Spotify-named `danceability`, `energy`, `valence`, `acousticness`,
-`speechiness`, or `instrumentalness` values. The learned outputs use custom `*_score_v1` names and
-remain uncalibrated until a permitted labeled corpus and held-out benchmark exist. Energy,
-speechiness, liveness, time signature, and valence-equivalent outputs remain unimplemented rather
-than being filled with unsupported heuristics.
+AcousticBrainz descriptors are not presented as deep embeddings. A true Discogs-EffNet track
+embedding still requires a waveform the user owns or otherwise has permission to analyze.
+
+The phase-5 implementation creates non-overlapping target periods, freezes behavior before each
+period, abstains on ambiguous outcomes, and reserves whole later periods for validation and test.
+It compares repeat/recency, artist, full behavior, descriptor, embedding, and combined variants;
+all audio comparisons use the same covered cohort. A private real-history behavior run is complete,
+while its detailed metrics and predictions remain ignored rather than being committed.
+
+The engine deliberately does not emit Spotify-named `danceability`, `energy`, `valence`,
+`acousticness`, `speechiness`, or `instrumentalness` values. Learned outputs use custom
+`*_score_v1` names and remain uncalibrated until a permitted labeled corpus and held-out benchmark
+exist. Unsupported properties remain absent instead of being filled with invented heuristics.

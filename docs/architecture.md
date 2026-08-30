@@ -8,7 +8,8 @@ private export
     -> privacy cleaning + normalization
     -> listening events
     -> track behavior aggregates
-    -> affinity labels
+    -> heuristic affinity + point-in-time behavior snapshots
+    -> future-period implicit-feedback labels
 
 permitted catalog metadata
     -> identity matches + confidence
@@ -19,7 +20,17 @@ permitted audio
     -> source-tagged feature observations
 
 features + behavior
-    -> clustering / similarity / preference ranking
+    -> training-only preprocessing
+    -> behavior/audio ablations on chronological splits
+    -> portable taste model
+
+feature representations
+    -> standardized K-Means/HDBSCAN experiments + PCA
+    -> taste-map assignments
+
+candidates + seeds + current behavior + selected model
+    -> acoustic similarity + predicted preference + novelty + diversity
+    -> explainable recommendations + Spotify URI handoff + explicit feedback
 ```
 
 ## Design rules
@@ -32,6 +43,9 @@ features + behavior
 5. Candidate retrieval and personal preference ranking expose separate scores.
 6. Network providers sit behind interfaces so synthetic fakes can exercise the pipeline.
 7. Pipeline writes are deterministic and safe to repeat.
+8. Whole target periods belong to exactly one split; no future-period behavior becomes a feature.
+9. Unplayed candidates are unknown, not negative labels.
+10. JSON model artifacts are data, never executable pickle payloads.
 
 ## Planned package ownership
 
@@ -46,4 +60,5 @@ features + behavior
 | `clustering` | Build and evaluate taste clusters |
 | `ranking` | Aggregate behavior, retrieve candidates, and rank results |
 | `evaluation` | Test feature behavior and recommendation quality |
+| `modeling` | Build temporal labels, lock feature profiles, train portable ablations |
 | `spotify_output` | Use supported Spotify operations for private output only |

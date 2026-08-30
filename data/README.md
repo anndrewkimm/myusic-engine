@@ -8,7 +8,7 @@ data/
   private/     Original account exports and other sensitive inputs
   raw/         Immutable, privacy-cleaned source records
   interim/     Resolved identities and intermediate computations
-  processed/   Aggregate model-ready tables and local reports
+  processed/   Model-ready tables, portable models, predictions, and local reports
 ```
 
 Keep the Spotify export ZIP in `data/private/`. Do not rename a real export to match a test

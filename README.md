@@ -3,9 +3,8 @@
 A private, local-first music intelligence pipeline for learning from Spotify listening
 behavior and combining it with independently computed or lawfully sourced audio features.
 
-The compact Spotify Account Data export has been validated locally. The richer Extended Streaming
-History export is still pending; no copyrighted Spotify audio is required to build or test the
-foundation.
+Both the compact Spotify Account Data export and the richer Extended Streaming History export have
+been validated locally. No copyrighted Spotify audio is required to build or test the foundation.
 
 > [!IMPORTANT]
 > Raw Spotify exports, account data, and audio files are private inputs. They are ignored by
@@ -25,13 +24,20 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 - verified cross-platform ONNX inference for 1,280-dimensional Discogs-EffNet embeddings;
 - six versioned learned scores for danceable, acoustic, instrumental, happy, aggressive, and
   relaxed audio characteristics;
-- exact cosine retrieval with weighted multi-seed queries and provenance-aware filters.
+- exact cosine retrieval with weighted multi-seed queries and provenance-aware filters;
+- cached, precision-first MusicBrainz mapping and frozen CC0 AcousticBrainz feature conversion;
+- leakage-safe 90-day taste labels with whole-period train/validation/test splits;
+- behavior, descriptor, embedding, and combined logistic ablations on matched audio cohorts;
+- standardized K-Means/HDBSCAN taste maps with stability evidence and PCA coordinates;
+- explainable candidate ranking, diversity controls, Spotify URI handoff, and feedback logging.
 
-The pending Extended export is not needed for the test suite. Phase 1 has been validated against
-the compact Account Data format, but still needs Extended-history validation and private EDA.
-Phase 2 now has an offline account-catalog resolver; external provider coverage and manual match
-validation remain. Phase 3 has a tested foundation, but its exit criterion still requires
-transformation tests and quality evaluation on a permitted real music corpus. See
+Phase 1 has now been validated against both Spotify export formats. Private EDA confirmed lifetime
+coverage, URI-backed track affinities, the expected Extended History playback signals, and a clean
+ingestion report. Phase 2 now has an offline account-catalog resolver; external provider coverage
+and manual match validation remain. A private behavior-only chronological model run is complete.
+Audio ablations and the real taste map remain gated on lawful feature/embedding coverage. Phase 3
+has a tested foundation, but its exit criterion still requires quality evaluation on a permitted
+real music corpus. See
 [current project status](docs/project-status.md).
 
 ## Development setup
@@ -104,6 +110,28 @@ Exact unique matches receive a stable URI. Fuzzy and ambiguous candidates remain
 reviewable; the resolver never silently promotes them to ground truth. See
 [offline identity resolution](docs/identity-resolution.md) for the policy and output contracts.
 
+## Obtain lawful historical descriptors
+
+The Extended History contains song identities and behavior, not audio samples. With explicit
+permission to send title, artist, and album metadata to public lookup services, map the highest
+precision MusicBrainz identities and fetch the frozen CC0 AcousticBrainz descriptors:
+
+```powershell
+python -m myusic_engine map-musicbrainz `
+  "data/processed/history/user_track_affinity.jsonl" `
+  --output-dir "data/interim/musicbrainz" `
+  --cache-dir "data/raw/provider-cache"
+
+python -m myusic_engine fetch-acousticbrainz `
+  "data/interim/musicbrainz/external_identity_matches.jsonl" `
+  --output-dir "data/processed/audio/acousticbrainz" `
+  --cache-dir "data/raw/provider-cache"
+```
+
+Only strict exact mapper results receive MBIDs. Fuzzy and unmatched results remain review-only.
+The mapper cache is resumable and `--offline` forbids network requests. AcousticBrainz supplies
+lawful historical descriptors and learned scores, but it does not replace a deep track embedding.
+
 ## Analyze permitted audio
 
 The Spotify export identifies listening behavior but contains no audio. Build a private ignored
@@ -134,6 +162,74 @@ definitions, limitations, and validation requirements are in the
 [phase-3 feature/model card](docs/audio-features-and-embeddings.md).
 The clean-room mapping to Spotify's published concepts, explicit non-parity boundaries, and
 calibration plan are in [Spotify-like feature research](docs/spotify-like-feature-research.md).
+
+## Train and evaluate personal taste
+
+Construct labels from actual later listening outcomes. Predictors are frozen before each target
+period, unplayed tracks are omitted rather than called dislikes, preprocessing fits on training
+only, and model selection never reads the final test period:
+
+```powershell
+python -m myusic_engine build-taste-dataset `
+  "data/processed/history/listening_events.jsonl" `
+  --output-dir "data/processed/modeling" `
+  --modeling-config "configs/modeling.yaml"
+
+# Available immediately from history alone.
+python -m myusic_engine train-taste-model `
+  "data/processed/modeling/temporal_taste_samples.jsonl" `
+  --output-dir "data/processed/models/behavior" `
+  --modeling-config "configs/modeling.yaml"
+
+# Repeat after permitted local audio has produced descriptors and deep embeddings.
+python -m myusic_engine train-taste-model `
+  "data/processed/modeling/temporal_taste_samples.jsonl" `
+  --features "data/processed/audio/features.jsonl" `
+  --profile local_discogs_effnet `
+  --output-dir "data/processed/models/audio" `
+  --modeling-config "configs/modeling.yaml"
+```
+
+Each fitted model is a content-hashed JSON artifact containing its scaler, coefficients,
+point-in-time boundary, and exact feature/profile versions. Held-out predictions and aggregate
+ablation metrics stay under ignored private paths. See
+[taste modeling and recommendation](docs/taste-modeling-and-recommendation.md).
+
+## Build the taste map and rank candidates
+
+```powershell
+python -m myusic_engine build-taste-map `
+  --features "data/processed/audio/features.jsonl" `
+  --profile local_discogs_effnet `
+  --representation embedding `
+  --output-dir "data/processed/taste-map"
+
+python -m myusic_engine rank-candidates `
+  "data/private/candidates.csv" `
+  --features "data/processed/audio/features.jsonl" `
+  --profile local_discogs_effnet `
+  --seed "spotify:track:0000000000000000000000=1.0" `
+  --model "data/processed/models/audio/selected_model.json" `
+  --behavior-snapshots "data/processed/modeling/behavior_snapshots.jsonl" `
+  --taste-map-assignments "data/processed/taste-map/taste_map_assignments.jsonl" `
+  --output-dir "data/processed/recommendations"
+```
+
+Candidate input can be CSV, JSON Lines, or a text file of Spotify track URIs/URLs. Results retain
+separate acoustic similarity, predicted preference, novelty, and artist-diversity components.
+Tracks without selected audio are explicitly marked `metadata_only`. The ordered
+`spotify_playlist_uris.txt` is the safe handoff until the user explicitly authorizes an official
+Spotify OAuth playlist operation.
+
+Record an outcome without rewriting earlier run artifacts:
+
+```powershell
+python -m myusic_engine record-feedback `
+  "data/processed/recommendations/feedback.jsonl" `
+  "RECOMMENDATION_RUN_ID" `
+  "spotify:track:0000000000000000000000" `
+  accepted
+```
 
 ## Why this is a data-science project
 
