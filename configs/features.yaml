@@ -14,9 +14,10 @@ audio:
   minimum_coverage_seconds: 20.0
 
 extractor:
-  source_version: objective-dsp-0.2.0
+  source_version: objective-dsp-0.3.0
   frame_length: 4096
   hop_length: 1024
+  silence_trim_db: 60.0
   rhythm_frame_length: 2048
   rhythm_hop_length: 512
   rhythm_onset_max_size: 5

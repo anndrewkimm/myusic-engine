@@ -21,9 +21,10 @@ class ObjectiveFeatureConfig:
 
     target_sample_rate_hz: int = 44_100
     minimum_coverage_seconds: float = 20.0
-    source_version: str = "objective-dsp-0.2.0"
+    source_version: str = "objective-dsp-0.3.0"
     frame_length: int = 4096
     hop_length: int = 1024
+    silence_trim_db: float = 60.0
     rhythm_frame_length: int = 2048
     rhythm_hop_length: int = 512
     rhythm_onset_max_size: int = 5
@@ -33,11 +34,20 @@ class ObjectiveFeatureConfig:
     minimum_tempo_beats: int = 4
 
     def __post_init__(self) -> None:
-        if not 8_000 <= self.target_sample_rate_hz <= 96_000:
+        if (
+            isinstance(self.target_sample_rate_hz, bool)
+            or not isinstance(self.target_sample_rate_hz, int)
+            or not 8_000 <= self.target_sample_rate_hz <= 96_000
+        ):
             raise FeatureConfigError("target_sample_rate_hz must be between 8000 and 96000")
-        if self.minimum_coverage_seconds <= 0:
-            raise FeatureConfigError("minimum_coverage_seconds must be positive")
-        if not self.source_version.strip():
+        if (
+            isinstance(self.minimum_coverage_seconds, bool)
+            or not isinstance(self.minimum_coverage_seconds, (int, float))
+            or not math.isfinite(self.minimum_coverage_seconds)
+            or self.minimum_coverage_seconds <= 0
+        ):
+            raise FeatureConfigError("minimum_coverage_seconds must be positive and finite")
+        if not isinstance(self.source_version, str) or not self.source_version.strip():
             raise FeatureConfigError("source_version must be non-empty")
         for name in (
             "frame_length",
@@ -55,6 +65,8 @@ class ObjectiveFeatureConfig:
             value = getattr(self, name)
             if not math.isfinite(value) or value <= 0:
                 raise FeatureConfigError(f"{name} must be a positive finite number")
+        if not math.isfinite(self.silence_trim_db) or not 20 <= self.silence_trim_db <= 120:
+            raise FeatureConfigError("silence_trim_db must be between 20 and 120")
         if self.hop_length > self.frame_length:
             raise FeatureConfigError("hop_length must not exceed frame_length")
         if self.rhythm_hop_length > self.rhythm_frame_length:
@@ -96,16 +108,57 @@ def load_objective_feature_config(path: str | Path) -> ObjectiveFeatureConfig:
     except (OSError, yaml.YAMLError) as exc:
         raise FeatureConfigError(f"Could not read feature configuration: {exc}") from exc
     root = _mapping(payload, "feature configuration")
+    allowed_root = {
+        "schema_version",
+        "feature_set",
+        "provenance",
+        "audio",
+        "extractor",
+        "features",
+        "embedding",
+        "learned_scores",
+    }
+    unknown_root = set(root) - allowed_root
+    if unknown_root:
+        raise FeatureConfigError(
+            f"Unknown feature configuration fields: {', '.join(sorted(unknown_root))}"
+        )
     if root.get("schema_version") != 1:
         raise FeatureConfigError("feature configuration schema_version must be 1")
     audio = _mapping(root.get("audio"), "audio")
     extractor = _mapping(root.get("extractor"), "extractor")
+    unknown_audio = set(audio) - {
+        "mono",
+        "target_sample_rate_hz",
+        "minimum_coverage_seconds",
+    }
+    if unknown_audio:
+        raise FeatureConfigError(f"Unknown audio fields: {', '.join(sorted(unknown_audio))}")
+    allowed_extractor = {
+        "source_version",
+        "frame_length",
+        "hop_length",
+        "silence_trim_db",
+        "rhythm_frame_length",
+        "rhythm_hop_length",
+        "rhythm_onset_max_size",
+        "rhythm_onset_absolute_floor",
+        "rhythm_onset_mad_multiplier",
+        "rhythm_onset_wait_frames",
+        "minimum_tempo_beats",
+    }
+    unknown_extractor = set(extractor) - allowed_extractor
+    if unknown_extractor:
+        raise FeatureConfigError(
+            f"Unknown extractor fields: {', '.join(sorted(unknown_extractor))}"
+        )
     return ObjectiveFeatureConfig(
         target_sample_rate_hz=_integer(audio, "target_sample_rate_hz"),
         minimum_coverage_seconds=_number(audio, "minimum_coverage_seconds"),
         source_version=_text(extractor, "source_version"),
         frame_length=_integer(extractor, "frame_length"),
         hop_length=_integer(extractor, "hop_length"),
+        silence_trim_db=_number(extractor, "silence_trim_db"),
         rhythm_frame_length=_integer(extractor, "rhythm_frame_length"),
         rhythm_hop_length=_integer(extractor, "rhythm_hop_length"),
         rhythm_onset_max_size=_integer(extractor, "rhythm_onset_max_size"),

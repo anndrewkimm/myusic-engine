@@ -49,6 +49,44 @@ def _clamp_ratio(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
+def _active_frame_mask(
+    rms_frames: NDArray[np.float64], silence_trim_db: float
+) -> NDArray[np.bool_]:
+    peak = float(np.max(rms_frames)) if rms_frames.size else 0.0
+    if not math.isfinite(peak) or peak <= 1e-7:
+        raise AudioAnalysisError("Audio is effectively silent")
+    threshold = max(1e-7, peak * 10.0 ** (-silence_trim_db / 20.0))
+    return np.asarray(rms_frames >= threshold, dtype=np.bool_)
+
+
+def _trim_boundary_silence(
+    samples: NDArray[np.float32], config: ObjectiveFeatureConfig
+) -> NDArray[np.float32]:
+    """Remove only leading/trailing silence without collapsing intentional interior gaps."""
+
+    librosa = load_librosa()
+    rms_frames = np.asarray(
+        librosa.feature.rms(
+            y=samples,
+            frame_length=config.frame_length,
+            hop_length=config.hop_length,
+            center=True,
+            pad_mode="constant",
+        )[0],
+        dtype=np.float64,
+    )
+    active_indices = np.flatnonzero(_active_frame_mask(rms_frames, config.silence_trim_db))
+    if active_indices.size == 0:
+        raise AudioAnalysisError("Audio is effectively silent")
+    half_frame = config.frame_length // 2
+    start = max(0, int(active_indices[0]) * config.hop_length - half_frame)
+    end = min(
+        samples.size,
+        int(active_indices[-1]) * config.hop_length + half_frame,
+    )
+    return np.ascontiguousarray(samples[start:end], dtype=np.float32)
+
+
 def _key_analysis(chroma_frames: NDArray[np.float64]) -> _KeyAnalysis:
     chroma = np.asarray(np.mean(chroma_frames, axis=1, dtype=np.float64), dtype=np.float64)
     total = float(np.sum(chroma))
@@ -93,9 +131,7 @@ def _tempo_analysis(
     )
     onset_median = float(np.median(onset_envelope))
     onset_mad = float(np.median(np.abs(onset_envelope - onset_median)))
-    robust_floor = onset_median + (
-        config.rhythm_onset_mad_multiplier * 1.4826 * onset_mad
-    )
+    robust_floor = onset_median + (config.rhythm_onset_mad_multiplier * 1.4826 * onset_mad)
     onset_floor = max(config.rhythm_onset_absolute_floor, robust_floor)
     gated_envelope = np.maximum(onset_envelope - onset_floor, 0.0)
     onset_frames = librosa.onset.onset_detect(
@@ -156,14 +192,11 @@ class ObjectiveFeatureExtractor:
 
         if audio.sample_rate_hz != self.config.target_sample_rate_hz:
             audio = resample_audio(audio, self.config.target_sample_rate_hz)
-        samples = audio.samples
+        samples = _trim_boundary_silence(audio.samples, self.config)
         sample_rate_hz = audio.sample_rate_hz
-        duration = audio.duration_seconds
+        duration = samples.size / sample_rate_hz
         if duration < 1.0:
-            raise AudioAnalysisError("At least one second of audio is required")
-        rms_signal = float(np.sqrt(np.mean(np.square(samples, dtype=np.float64))))
-        if rms_signal <= 1e-7:
-            raise AudioAnalysisError("Audio is effectively silent")
+            raise AudioAnalysisError("At least one second of non-silent audio is required")
         coverage_confidence = _clamp_ratio(duration / self.config.minimum_coverage_seconds)
         librosa = load_librosa()
 
@@ -179,7 +212,21 @@ class ObjectiveFeatureExtractor:
             )
         ).astype(np.float64, copy=False)
         power = np.square(spectrum)
-        mean_power = np.asarray(np.mean(power, axis=1, dtype=np.float64), dtype=np.float64)
+        rms_frames = np.asarray(
+            librosa.feature.rms(
+                y=samples,
+                frame_length=self.config.frame_length,
+                hop_length=self.config.hop_length,
+                center=True,
+                pad_mode="constant",
+            )[0],
+            dtype=np.float64,
+        )
+        active_frames = _active_frame_mask(rms_frames, self.config.silence_trim_db)
+        if power.shape[1] != active_frames.size:
+            raise AudioAnalysisError("Audio frame alignment failed")
+        active_power = power[:, active_frames]
+        mean_power = np.asarray(np.mean(active_power, axis=1, dtype=np.float64), dtype=np.float64)
         total_power = float(np.sum(mean_power))
         if total_power <= 1e-16:
             raise AudioAnalysisError("Audio has insufficient spectral energy")
@@ -191,20 +238,13 @@ class ObjectiveFeatureExtractor:
         rolloff_index = int(np.searchsorted(cumulative_power, 0.85 * total_power))
         rolloff_index = min(rolloff_index, frequencies.size - 1)
         spectral_rolloff = float(frequencies[rolloff_index])
-        positive_power = np.maximum(power, 1e-20)
+        positive_power = np.maximum(active_power, 1e-20)
         frame_flatness = np.exp(np.mean(np.log(positive_power), axis=0)) / np.mean(
             positive_power, axis=0
         )
         spectral_flatness = _clamp_ratio(float(np.mean(frame_flatness)))
 
-        rms_frames = librosa.feature.rms(
-            y=samples,
-            frame_length=self.config.frame_length,
-            hop_length=self.config.hop_length,
-            center=True,
-            pad_mode="constant",
-        )[0]
-        rms_db = 20.0 * np.log10(np.maximum(rms_frames, 1e-10))
+        rms_db = 20.0 * np.log10(np.maximum(rms_frames[active_frames], 1e-10))
         dynamic_range_db = max(0.0, float(np.percentile(rms_db, 95) - np.percentile(rms_db, 10)))
         try:
             loudness = float(pyln.Meter(sample_rate_hz).integrated_loudness(samples))
@@ -219,7 +259,7 @@ class ObjectiveFeatureExtractor:
             tuning=0.0,
             norm=2,
         ).astype(np.float64, copy=False)
-        key = _key_analysis(chroma_frames)
+        key = _key_analysis(chroma_frames[:, active_frames])
         tempo = _tempo_analysis(samples, sample_rate_hz, self.config)
         mfcc = librosa.feature.mfcc(
             y=samples,
@@ -257,8 +297,14 @@ class ObjectiveFeatureExtractor:
             observation("spectral_flatness_v1", spectral_flatness),
             observation("dynamic_range_db_v1", dynamic_range_db),
             observation("chroma_mean_v1", key.chroma),
-            observation("mfcc_mean_v1", tuple(float(value) for value in np.mean(mfcc, axis=1))),
-            observation("mfcc_std_v1", tuple(float(value) for value in np.std(mfcc, axis=1))),
+            observation(
+                "mfcc_mean_v1",
+                tuple(float(value) for value in np.mean(mfcc[:, active_frames], axis=1)),
+            ),
+            observation(
+                "mfcc_std_v1",
+                tuple(float(value) for value in np.std(mfcc[:, active_frames], axis=1)),
+            ),
         ]
         if tempo.tempo_bpm is not None:
             observations.append(
