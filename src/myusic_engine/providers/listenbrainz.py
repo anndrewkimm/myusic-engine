@@ -39,6 +39,8 @@ class ListenBrainzMapping:
                 raise ProviderError(f"ListenBrainz returned an empty {field_name}")
         if self.release_mbid is not None and _MBID_PATTERN.fullmatch(self.release_mbid) is None:
             raise ProviderError("ListenBrainz returned an invalid release MBID")
+        if any(_MBID_PATTERN.fullmatch(value) is None for value in self.artist_mbids):
+            raise ProviderError("ListenBrainz returned an invalid artist MBID")
         if not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1:
             raise ProviderError("ListenBrainz mapping confidence must be in [0, 1]")
 
@@ -56,9 +58,10 @@ class MusicBrainzMapper(Protocol):
 
 
 class ListenBrainzMappingClient:
-    """Read the fast public metadata mapper through the shared local cache."""
+    """Read MetaBrainz Labs' public semi-exact metadata mapper through the local cache."""
 
-    endpoint = "https://mapper.listenbrainz.org/mapping/lookup"
+    artist_recording_endpoint = "https://labs.api.listenbrainz.org/acr-lookup/json"
+    artist_recording_release_endpoint = "https://labs.api.listenbrainz.org/acrr-lookup/json"
 
     def __init__(self, transport: JsonCacheTransport) -> None:
         self.transport = transport
@@ -70,18 +73,28 @@ class ListenBrainzMappingClient:
         recording_name: str,
         release_name: str | None,
     ) -> ListenBrainzMapping | None:
-        parameters = {
+        parameters: dict[str, str] = {
             "artist_credit_name": artist_name,
             "recording_name": recording_name,
         }
         if release_name:
             parameters["release_name"] = release_name
-        payload = self.transport.get_json("listenbrainz-mapper", self.endpoint, parameters)
+        endpoint = (
+            self.artist_recording_release_endpoint
+            if release_name
+            else self.artist_recording_endpoint
+        )
+        namespace = "listenbrainz-acrr" if release_name else "listenbrainz-acr"
+        payload = self.transport.get_json(namespace, endpoint, parameters)
         if payload is None:
             return None
-        if not isinstance(payload, Mapping):
-            raise ProviderError("ListenBrainz mapping response must be an object")
-        record = cast(Mapping[str, object], payload)
+        if not isinstance(payload, Sequence) or isinstance(payload, (str, bytes, bytearray)):
+            raise ProviderError("ListenBrainz mapping response must be an array")
+        if not payload:
+            return None
+        if len(payload) != 1 or not isinstance(payload[0], Mapping):
+            raise ProviderError("ListenBrainz mapping response must contain one result")
+        record = cast(Mapping[str, object], payload[0])
         raw_mbid = record.get("recording_mbid")
         if raw_mbid is None:
             return None
@@ -96,7 +109,9 @@ class ListenBrainzMappingClient:
             release_mbid=self._optional_text(record.get("release_mbid"), "release_mbid"),
             release_name=self._optional_text(record.get("release_name"), "release_name"),
             artist_mbids=artist_mbids,
-            confidence=self._confidence(record.get("confidence")),
+            # These endpoints perform normalized semi-exact lookups. The downstream policy still
+            # compares the returned canonical metadata to every original field before acceptance.
+            confidence=1.0,
         )
 
     @staticmethod
@@ -116,9 +131,3 @@ class ListenBrainzMappingClient:
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
             raise ProviderError(f"ListenBrainz response field {field_name} must be an array")
         return tuple(cls._text(item, field_name) for item in value)
-
-    @staticmethod
-    def _confidence(value: object) -> float:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ProviderError("ListenBrainz response confidence must be numeric")
-        return float(value)

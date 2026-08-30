@@ -17,12 +17,144 @@ from myusic_engine.matching import (
     resolve_external_identities,
     write_external_identity_resolution,
 )
-from myusic_engine.providers import AcousticBrainzDocument, ListenBrainzMapping
+from myusic_engine.providers import (
+    AcousticBrainzClient,
+    AcousticBrainzDocument,
+    ListenBrainzMapping,
+    ListenBrainzMappingClient,
+    ProviderError,
+)
 
 FIRST_MBID = "00000000-0000-4000-8000-000000000001"
 SECOND_MBID = "00000000-0000-4000-8000-000000000002"
 RELEASE_MBID = "00000000-0000-4000-8000-000000000003"
 ARTIST_MBID = "00000000-0000-4000-8000-000000000004"
+
+
+class FakeJsonTransport:
+    def __init__(self, payload: object) -> None:
+        self.payload = payload
+        self.calls: list[tuple[str, str, Mapping[str, str] | None]] = []
+
+    def get_json(
+        self,
+        namespace: str,
+        url: str,
+        parameters: Mapping[str, str] | None = None,
+    ) -> object:
+        self.calls.append((namespace, url, parameters))
+        return self.payload
+
+
+class FakeSequencedTransport:
+    def __init__(self, *payloads: object) -> None:
+        self.payloads = list(payloads)
+        self.calls: list[tuple[str, str, Mapping[str, str] | None]] = []
+
+    def get_json(
+        self,
+        namespace: str,
+        url: str,
+        parameters: Mapping[str, str] | None = None,
+    ) -> object:
+        self.calls.append((namespace, url, parameters))
+        return self.payloads.pop(0)
+
+
+def _labs_mapping_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "index": 0,
+            "recording_mbid": FIRST_MBID,
+            "recording_name": "Exact Song",
+            "artist_credit_name": "Synthetic Artist",
+            "release_mbid": RELEASE_MBID,
+            "release_name": "Exact Album",
+            "artist_mbids": [ARTIST_MBID],
+        }
+    ]
+
+
+def test_listenbrainz_client_uses_current_labs_exact_lookup() -> None:
+    transport = FakeJsonTransport(_labs_mapping_payload())
+    client = ListenBrainzMappingClient(transport)  # type: ignore[arg-type]
+
+    mapping = client.lookup(
+        artist_name="Synthetic Artist",
+        recording_name="Exact Song",
+        release_name="Exact Album",
+    )
+
+    assert mapping is not None
+    assert mapping.recording_mbid == FIRST_MBID
+    assert mapping.confidence == 1.0
+    assert transport.calls == [
+        (
+            "listenbrainz-acrr",
+            "https://labs.api.listenbrainz.org/acrr-lookup/json",
+            {
+                "artist_credit_name": "Synthetic Artist",
+                "recording_name": "Exact Song",
+                "release_name": "Exact Album",
+            },
+        )
+    ]
+
+
+def test_listenbrainz_client_rejects_ambiguous_provider_payload() -> None:
+    transport = FakeJsonTransport(_labs_mapping_payload() * 2)
+    client = ListenBrainzMappingClient(transport)  # type: ignore[arg-type]
+
+    with pytest.raises(ProviderError, match="one result"):
+        client.lookup(
+            artist_name="Synthetic Artist",
+            recording_name="Exact Song",
+            release_name=None,
+        )
+
+
+def test_acousticbrainz_client_batches_and_selects_the_first_numeric_offset() -> None:
+    transport = FakeSequencedTransport(
+        {FIRST_MBID: {"0": _low_level()}, "mbid_mapping": {}},
+        {FIRST_MBID: {"7": _high_level()}},
+    )
+    client = AcousticBrainzClient(transport)  # type: ignore[arg-type]
+
+    documents = client.fetch((FIRST_MBID.upper(), FIRST_MBID))
+
+    assert tuple(documents) == (FIRST_MBID,)
+    assert documents[FIRST_MBID].low_level == _low_level()
+    assert documents[FIRST_MBID].high_level == _high_level()
+    assert transport.calls[0][0:2] == (
+        "acousticbrainz-low-level",
+        "https://acousticbrainz.org/api/v1/low-level",
+    )
+    assert transport.calls[1] == (
+        "acousticbrainz-high-level",
+        "https://acousticbrainz.org/api/v1/high-level",
+        {"recording_ids": FIRST_MBID, "map_classes": "false"},
+    )
+
+
+@pytest.mark.parametrize(
+    "recording_mbids",
+    [
+        ("not-an-mbid",),
+        tuple(f"00000000-0000-4000-8000-{index:012d}" for index in range(26)),
+    ],
+)
+def test_acousticbrainz_client_rejects_invalid_batches(
+    recording_mbids: tuple[str, ...],
+) -> None:
+    client = AcousticBrainzClient(FakeSequencedTransport())  # type: ignore[arg-type]
+    with pytest.raises(ProviderError):
+        client.fetch(recording_mbids)
+
+
+def test_acousticbrainz_client_rejects_invalid_response_shape() -> None:
+    client = AcousticBrainzClient(FakeSequencedTransport([], {}))  # type: ignore[arg-type]
+    with pytest.raises(ProviderError, match="low-level response"):
+        client.fetch((FIRST_MBID,))
 
 
 class FakeMapper:

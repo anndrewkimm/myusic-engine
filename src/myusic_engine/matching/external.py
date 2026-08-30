@@ -55,7 +55,7 @@ _MATCH_FIELDS = frozenset(
 class ExternalIdentityPolicy:
     """Precision-first boundary for provider-suggested MusicBrainz recording matches."""
 
-    policy_version: str = "listenbrainz_mapper_exact_metadata_v1"
+    policy_version: str = "listenbrainz_labs_exact_metadata_v2"
     minimum_provider_confidence: float = 0.90
     review_sample_per_status: int = 20
 
@@ -276,7 +276,7 @@ def _match_query(
             album_name=query.album_name,
             play_count=query.play_count,
             total_ms_played=query.total_ms_played,
-            provider="listenbrainz_musicbrainz_mapper",
+            provider="listenbrainz_labs_musicbrainz_mapper",
             match_status="unmatched",
             match_method="provider_unmatched",
             recording_mbid=None,
@@ -323,7 +323,7 @@ def _match_query(
         album_name=query.album_name,
         play_count=query.play_count,
         total_ms_played=query.total_ms_played,
-        provider="listenbrainz_musicbrainz_mapper",
+        provider="listenbrainz_labs_musicbrainz_mapper",
         match_status=status,
         match_method=method,
         recording_mbid=accepted_mbid,
@@ -393,7 +393,7 @@ def resolve_external_identities(
     processed = len(matches)
     report = ExternalIdentityReport(
         policy_version=active_policy.policy_version,
-        provider="listenbrainz_musicbrainz_mapper",
+        provider="listenbrainz_labs_musicbrainz_mapper",
         queries_available=len(ordered_queries),
         queries_processed=processed,
         exact_count=len(exact_matches),

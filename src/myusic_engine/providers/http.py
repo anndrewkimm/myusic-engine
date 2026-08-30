@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 import time
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from email.message import Message
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import cast
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from myusic_engine.io import atomic_write_text
@@ -18,6 +22,9 @@ from myusic_engine.io import atomic_write_text
 
 class ProviderError(ValueError):
     """Raised when a permitted provider request or cached response is unusable."""
+
+
+_NAMESPACE_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 class JsonCacheTransport:
@@ -33,12 +40,22 @@ class JsonCacheTransport:
         max_retries: int = 3,
         offline: bool = False,
     ) -> None:
-        if not user_agent.strip():
+        if not isinstance(user_agent, str) or not user_agent.strip():
             raise ProviderError("Provider user_agent must be non-empty")
-        if timeout_seconds <= 0:
-            raise ProviderError("Provider timeout_seconds must be positive")
-        if minimum_interval_seconds < 0:
-            raise ProviderError("Provider minimum_interval_seconds must be non-negative")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ProviderError("Provider timeout_seconds must be positive and finite")
+        if (
+            isinstance(minimum_interval_seconds, bool)
+            or not isinstance(minimum_interval_seconds, (int, float))
+            or not math.isfinite(minimum_interval_seconds)
+            or minimum_interval_seconds < 0
+        ):
+            raise ProviderError("Provider minimum_interval_seconds must be non-negative and finite")
         if isinstance(max_retries, bool) or not isinstance(max_retries, int) or max_retries < 0:
             raise ProviderError("Provider max_retries must be a non-negative integer")
         self.cache_dir = Path(cache_dir)
@@ -57,7 +74,16 @@ class JsonCacheTransport:
     ) -> object | None:
         """Return a cached or freshly fetched JSON value; HTTP 404 is represented by null."""
 
-        if not namespace.strip() or not url.startswith("https://"):
+        parsed_url = urlsplit(url)
+        invalid_url = (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname is None
+            or any(character.isspace() for character in parsed_url.hostname)
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or bool(parsed_url.fragment)
+        )
+        if _NAMESPACE_PATTERN.fullmatch(namespace) is None or invalid_url:
             raise ProviderError("Provider namespace and HTTPS URL are required")
         ordered_parameters = sorted((parameters or {}).items())
         cache_identity = json.dumps(
@@ -86,7 +112,11 @@ class JsonCacheTransport:
             envelope = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ProviderError("A cached provider response is unreadable") from exc
-        if not isinstance(envelope, Mapping) or envelope.get("cache_schema_version") != 1:
+        if (
+            not isinstance(envelope, Mapping)
+            or envelope.get("cache_schema_version") != 1
+            or "payload" not in envelope
+        ):
             raise ProviderError("A cached provider response has an unsupported schema")
         return envelope.get("payload")
 
@@ -142,5 +172,12 @@ class JsonCacheTransport:
             try:
                 return max(0.1, min(60.0, float(raw_value)))
             except ValueError:
-                continue
+                try:
+                    retry_at = parsedate_to_datetime(raw_value)
+                    if retry_at.tzinfo is None or retry_at.utcoffset() is None:
+                        retry_at = retry_at.replace(tzinfo=UTC)
+                    delay = (retry_at.astimezone(UTC) - datetime.now(UTC)).total_seconds()
+                    return max(0.1, min(60.0, delay))
+                except (TypeError, ValueError, OverflowError):
+                    continue
         return min(30.0, 2.0**attempt)
