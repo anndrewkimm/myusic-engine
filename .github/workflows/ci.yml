@@ -44,7 +44,20 @@ jobs:
         run: python -m ruff format --check .
       - name: Type check
         if: matrix.python-version == '3.14'
-        run: python -m mypy
+        shell: bash
+        run: |
+          python -m mypy --version
+          set +e
+          output="$(python -m mypy src/myusic_engine 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if (( status != 0 )); then
+            while IFS= read -r line; do
+              echo "::error::$line"
+            done <<< "$output"
+          fi
+          exit "$status"
       - name: Build wheel
         if: matrix.python-version == '3.14'
         run: >-
