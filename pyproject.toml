@@ -71,7 +71,7 @@ select = ["B", "E", "F", "I", "SIM", "UP"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-packages = ["myusic_engine"]
+files = ["src/myusic_engine"]
 
 [[tool.mypy.overrides]]
 module = ["onnxruntime", "pyloudnorm", "scipy.*", "sklearn.*", "soundfile"]
