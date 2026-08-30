@@ -10,7 +10,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
 authors = [{ name = "Andrew" }]
-dependencies = ["PyYAML>=6.0,<7"]
+dependencies = [
+  "numpy>=2.0,<3",
+  "PyYAML>=6.0,<7",
+  "scikit-learn>=1.6,<2",
+]
 
 [project.scripts]
 myusic-engine = "myusic_engine.cli:main"
@@ -33,6 +37,7 @@ dev = [
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
   "scipy>=1.14,<2",
+  "scikit-learn>=1.6,<2",
   "soundfile>=0.13,<0.14",
   "types-PyYAML>=6.0,<7",
 ]
@@ -66,5 +71,5 @@ strict = true
 packages = ["myusic_engine"]
 
 [[tool.mypy.overrides]]
-module = ["onnxruntime", "pyloudnorm", "scipy.*", "soundfile"]
+module = ["onnxruntime", "pyloudnorm", "scipy.*", "sklearn.*", "soundfile"]
 ignore_missing_imports = true

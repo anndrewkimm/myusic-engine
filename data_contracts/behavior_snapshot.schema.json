@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/behavior-snapshot-v1.json",
+  "title": "Current point-in-time track behavior snapshot",
+  "type": "object",
+  "required": [
+    "schema_version", "track_id", "artist_key", "as_of", "behavior_features",
+    "dataset_version"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "track_id": { "type": "string", "minLength": 1 },
+    "artist_key": { "type": ["string", "null"] },
+    "as_of": { "type": "string", "format": "date-time" },
+    "behavior_features": { "type": "object", "additionalProperties": { "type": "number" } },
+    "dataset_version": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

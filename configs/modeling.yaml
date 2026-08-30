@@ -1,0 +1,107 @@
+schema_version: 1
+
+temporal:
+  dataset_version: temporal_taste_v1
+  period_days: 90
+  validation_fraction: 0.20
+  test_fraction: 0.20
+  minimum_train_periods: 4
+  minimum_labeled_events: 1
+  positive_fraction_threshold: 0.60
+  negative_fraction_threshold: 0.40
+  positive_minimum_ms: 30000
+  early_skip_maximum_ms: 30000
+  recency_half_life_days: 180
+  maximum_sample_weight: 5.0
+  complete_end_reasons:
+    - endplay
+    - trackdone
+  skip_end_reasons:
+    - backbtn
+    - fwdbtn
+  intentional_start_reasons:
+    - backbtn
+    - clickrow
+    - fwdbtn
+    - playbtn
+    - remote
+  passive_start_reasons:
+    - appload
+    - autoplay
+    - trackdone
+
+model:
+  model_version: taste_logistic_v1
+  random_seed: 1729
+  regularization_c: 1.0
+  maximum_iterations: 2000
+  ranking_k: 20
+
+profiles:
+  acousticbrainz_lowlevel:
+    profile_version: acousticbrainz_lowlevel_profile_v1
+    minimum_confidence: 0.50
+    descriptor_inputs:
+      - feature_name: acousticbrainz_descriptor_vector_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 12
+    embedding_input: null
+
+  local_discogs_effnet:
+    profile_version: local_discogs_effnet_profile_v1
+    minimum_confidence: 0.50
+    descriptor_inputs:
+      - feature_name: beat_strength_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: onset_rate_hz_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: key_strength_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: bass_energy_ratio_150hz_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: bass_energy_ratio_250hz_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: spectral_centroid_hz_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: spectral_rolloff_85_hz_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: spectral_flatness_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: dynamic_range_db_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 1
+      - feature_name: chroma_mean_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 12
+      - feature_name: mfcc_mean_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 20
+      - feature_name: mfcc_std_v1
+        feature_source: clean_room_audio
+        source_version: objective-dsp-0.2.0
+        dimensions: 20
+    embedding_input:
+      feature_name: discogs_effnet_embedding_v1
+      feature_source: mtg_essentia_onnx
+      source_version: discogs-effnet-bsdynamic-1+musicnn-preprocess-v1+mean-l2-v1
+      dimensions: 1280

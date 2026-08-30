@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/temporal-taste-sample-v1.json",
+  "title": "Point-in-time personal taste training sample",
+  "type": "object",
+  "required": [
+    "schema_version", "sample_id", "track_id", "artist_key", "period_index",
+    "period_start", "period_end", "split", "label", "positive_events",
+    "negative_events", "outcome_positive_rate", "sample_weight",
+    "behavior_features", "dataset_version"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "sample_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "track_id": { "type": "string", "minLength": 1 },
+    "artist_key": { "type": ["string", "null"] },
+    "period_index": { "type": "integer", "minimum": 0 },
+    "period_start": { "type": "string", "format": "date-time" },
+    "period_end": { "type": "string", "format": "date-time" },
+    "split": { "enum": ["train", "validation", "test"] },
+    "label": { "enum": [0, 1] },
+    "positive_events": { "type": "integer", "minimum": 0 },
+    "negative_events": { "type": "integer", "minimum": 0 },
+    "outcome_positive_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "sample_weight": { "type": "number", "exclusiveMinimum": 0 },
+    "behavior_features": { "$ref": "#/$defs/behaviorFeatures" },
+    "dataset_version": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "behaviorFeatures": {
+      "type": "object",
+      "required": [
+        "prior_seen", "prior_log_play_count", "prior_log_total_ms",
+        "prior_outcome_coverage", "prior_positive_rate", "prior_early_skip_rate",
+        "prior_intentional_coverage", "prior_intentional_rate", "prior_recency_score",
+        "prior_track_age_log_days", "prior_artist_log_play_count",
+        "prior_artist_outcome_coverage", "prior_artist_positive_rate"
+      ],
+      "additionalProperties": { "type": "number" }
+    }
+  },
+  "additionalProperties": false
+}
