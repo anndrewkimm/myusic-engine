@@ -293,8 +293,10 @@ def _candidates(
     best_by_uri: dict[str, tuple[CatalogTrack, float]] = {}
     for track, score in scored_tracks:
         current = best_by_uri.get(track.track_uri)
-        if current is None or score > current[1] or (
-            score == current[1] and _catalog_source(track) < _catalog_source(current[0])
+        if (
+            current is None
+            or score > current[1]
+            or (score == current[1] and _catalog_source(track) < _catalog_source(current[0]))
         ):
             best_by_uri[track.track_uri] = (track, score)
     ordered = sorted(
@@ -393,10 +395,7 @@ def _resolve_query(
 
     if album:
         exact_album = _candidates(
-            (
-                (track, 1.0)
-                for track in index.by_title_artist_album.get((title, artist, album), [])
-            ),
+            ((track, 1.0) for track in index.by_title_artist_album.get((title, artist, album), [])),
             limit=policy.max_candidates,
         )
         if len(exact_album) == 1:
@@ -480,9 +479,7 @@ def resolve_identities(
     )
     status_counter = Counter(match.match_status for match in matches)
     method_counter = Counter(match.match_method for match in matches)
-    status_counts: dict[str, int] = {
-        status: status_counter[status] for status in _MATCH_STATUSES
-    }
+    status_counts: dict[str, int] = {status: status_counter[status] for status in _MATCH_STATUSES}
     status_rates: dict[str, float] = {
         status: round(status_counts[status] / len(matches), 6) for status in _MATCH_STATUSES
     }

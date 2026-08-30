@@ -119,9 +119,7 @@ def _validated_uri(value: str, *, label: str) -> str:
     return value
 
 
-def _library_tracks(
-    payload: Mapping[str, object], source_file: str
-) -> Iterable[CatalogTrack]:
+def _library_tracks(payload: Mapping[str, object], source_file: str) -> Iterable[CatalogTrack]:
     sections = (("tracks", "saved_library"), ("bannedTracks", "banned_library"))
     for field_name, source_collection in sections:
         for index, raw_record in enumerate(_records(payload.get(field_name, []), label=field_name)):
@@ -140,9 +138,7 @@ def _library_tracks(
             )
 
 
-def _playlist_tracks(
-    payload: Mapping[str, object], source_file: str
-) -> Iterable[CatalogTrack]:
+def _playlist_tracks(payload: Mapping[str, object], source_file: str) -> Iterable[CatalogTrack]:
     for playlist_index, raw_playlist in enumerate(
         _records(payload.get("playlists"), label="playlists")
     ):

@@ -113,9 +113,9 @@ def test_prepare_history_writes_only_cleaned_events_and_aggregate_report(tmp_pat
 
     result = prepare_history(FIXTURE_PATH, output_directory)
 
-    event_lines = (output_directory / "listening_events.jsonl").read_text(
-        encoding="utf-8"
-    ).splitlines()
+    event_lines = (
+        (output_directory / "listening_events.jsonl").read_text(encoding="utf-8").splitlines()
+    )
     report = json.loads((output_directory / "ingestion_report.json").read_text(encoding="utf-8"))
     serialized_output = "\n".join(event_lines) + json.dumps(report)
 

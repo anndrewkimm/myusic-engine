@@ -64,12 +64,8 @@ def test_feature_heads_pool_the_named_positive_classes(tmp_path: Path) -> None:
     for spec in (danceability, relaxed):
         (tmp_path / spec.filename).write_bytes(b"synthetic model placeholder")
     sessions = {
-        danceability.task: _FakeHeadSession(
-            np.asarray(((0.9, 0.1), (0.7, 0.3), (0.5, 0.5)))
-        ),
-        relaxed.task: _FakeHeadSession(
-            np.asarray(((0.8, 0.2), (0.4, 0.6), (0.1, 0.9)))
-        ),
+        danceability.task: _FakeHeadSession(np.asarray(((0.9, 0.1), (0.7, 0.3), (0.5, 0.5)))),
+        relaxed.task: _FakeHeadSession(np.asarray(((0.8, 0.2), (0.4, 0.6), (0.1, 0.9)))),
     }
     backend = DiscogsEffnetFeatureHeadBackend(
         tmp_path,

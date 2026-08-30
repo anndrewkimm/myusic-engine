@@ -276,9 +276,7 @@ def test_cli_resolves_identities_from_local_account_data(
             "total_ms_played": 1000,
         },
     ]
-    affinity_path.write_text(
-        "\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8"
-    )
+    affinity_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
     output_directory = tmp_path / "identity"
 
     exit_code = main(

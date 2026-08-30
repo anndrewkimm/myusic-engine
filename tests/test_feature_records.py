@@ -58,9 +58,7 @@ def test_feature_values_round_trip_through_the_contract(
         ({"value": (0.0, float("nan"))}, "finite"),
     ],
 )
-def test_invalid_feature_records_are_rejected(
-    overrides: dict[str, object], message: str
-) -> None:
+def test_invalid_feature_records_are_rejected(overrides: dict[str, object], message: str) -> None:
     arguments: dict[str, object] = {
         "track_id": "track-a",
         "feature_name": "tempo_bpm_estimate_v1",
