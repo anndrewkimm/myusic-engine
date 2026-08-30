@@ -242,10 +242,13 @@ def _parser() -> argparse.ArgumentParser:
         "--features",
         type=Path,
         action="append",
-        required=True,
-        help="Source-tagged feature JSONL; repeat when needed",
+        default=[],
+        help="Optional source-tagged feature JSONL; repeat when an audio profile is used",
     )
-    candidate_parser.add_argument("--profile", required=True, help="Audio profile name")
+    candidate_parser.add_argument(
+        "--profile",
+        help="Optional audio profile name; omit for behavior-only ranking",
+    )
     candidate_parser.add_argument(
         "--seed",
         action="append",
@@ -723,9 +726,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
 
         try:
-            modeling_config = load_modeling_config(args.modeling_config)
-            if args.profile not in modeling_config.profiles:
-                raise ModelingConfigError(f"Unknown audio profile: {args.profile}")
+            if args.profile is None and args.features:
+                raise ModelingConfigError("--features requires an explicit --profile")
+            if args.profile is not None and not args.features:
+                raise ModelingConfigError("An audio profile requires at least one --features file")
+            selected_profile = None
+            if args.profile is not None:
+                modeling_config = load_modeling_config(args.modeling_config)
+                if args.profile not in modeling_config.profiles:
+                    raise ModelingConfigError(f"Unknown audio profile: {args.profile}")
+                selected_profile = modeling_config.profiles[args.profile]
             seeds: dict[str, float] = {}
             for raw_seed in args.seed:
                 if "=" not in raw_seed:
@@ -748,7 +758,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             recommendation_result = rank_candidates(
                 read_candidates(args.candidates),
                 feature_observations,
-                profile=modeling_config.profiles[args.profile],
+                profile=selected_profile,
                 profile_name=args.profile,
                 seed_weights=seeds,
                 model=read_taste_model(args.model) if args.model is not None else None,

@@ -30,6 +30,14 @@ from myusic_engine.ranking.candidates import CandidateTrack
 from myusic_engine.ranking.similarity import weighted_query_embedding
 
 RankingTier: TypeAlias = Literal["audio_ranked", "preference_ranked", "metadata_only"]
+_ARTIST_BEHAVIOR_INDICES = tuple(
+    BEHAVIOR_FEATURE_NAMES.index(name)
+    for name in (
+        "prior_artist_log_play_count",
+        "prior_artist_outcome_coverage",
+        "prior_artist_positive_rate",
+    )
+)
 
 
 class RecommendationError(ValueError):
@@ -43,6 +51,7 @@ class RecommendationConfig:
     audio_similarity_weight: float = 0.50
     predicted_preference_weight: float = 0.35
     novelty_bonus_weight: float = 0.15
+    preference_only_novelty_bonus_weight: float = 0.0
     artist_repetition_penalty: float = 0.10
     maximum_per_artist: int = 3
     explanation_feature_count: int = 5
@@ -53,6 +62,7 @@ class RecommendationConfig:
             self.audio_similarity_weight,
             self.predicted_preference_weight,
             self.novelty_bonus_weight,
+            self.preference_only_novelty_bonus_weight,
             self.artist_repetition_penalty,
         )
         if self.schema_version != 1 or any(
@@ -82,6 +92,7 @@ def load_recommendation_config(path: str | Path) -> RecommendationConfig:
         "audio_similarity_weight",
         "predicted_preference_weight",
         "novelty_bonus_weight",
+        "preference_only_novelty_bonus_weight",
         "artist_repetition_penalty",
         "maximum_per_artist",
         "explanation_feature_count",
@@ -109,6 +120,10 @@ def load_recommendation_config(path: str | Path) -> RecommendationConfig:
             "predicted_preference_weight", defaults.predicted_preference_weight
         ),
         novelty_bonus_weight=number("novelty_bonus_weight", defaults.novelty_bonus_weight),
+        preference_only_novelty_bonus_weight=number(
+            "preference_only_novelty_bonus_weight",
+            defaults.preference_only_novelty_bonus_weight,
+        ),
         artist_repetition_penalty=number(
             "artist_repetition_penalty", defaults.artist_repetition_penalty
         ),
@@ -187,8 +202,14 @@ class RecommendationReport:
     model_name: str | None
     taste_map_model_id: str | None
     seed_cluster_counts: dict[int, int]
-    profile_name: str
-    profile_version: str
+    profile_name: str | None
+    profile_version: str | None
+    candidate_digest: str
+    feature_digest: str
+    behavior_snapshot_digest: str
+    taste_map_assignment_digest: str
+    behavior_dataset_version: str | None
+    behavior_snapshot_as_of: str | None
     config: RecommendationConfig
     schema_version: int = 1
 
@@ -210,10 +231,21 @@ class RecommendationReport:
             },
             "profile_name": self.profile_name,
             "profile_version": self.profile_version,
+            "input_digests": {
+                "candidates": self.candidate_digest,
+                "features": self.feature_digest,
+                "behavior_snapshots": self.behavior_snapshot_digest,
+                "taste_map_assignments": self.taste_map_assignment_digest,
+            },
+            "behavior_dataset_version": self.behavior_dataset_version,
+            "behavior_snapshot_as_of": self.behavior_snapshot_as_of,
             "ranking_config": {
                 "audio_similarity_weight": self.config.audio_similarity_weight,
                 "predicted_preference_weight": self.config.predicted_preference_weight,
                 "novelty_bonus_weight": self.config.novelty_bonus_weight,
+                "preference_only_novelty_bonus_weight": (
+                    self.config.preference_only_novelty_bonus_weight
+                ),
                 "artist_repetition_penalty": self.config.artist_repetition_penalty,
                 "maximum_per_artist": self.config.maximum_per_artist,
                 "explanation_feature_count": self.config.explanation_feature_count,
@@ -259,12 +291,7 @@ def _behavior_for_candidate(
     key = artist_key(candidate.artist_name)
     artist_snapshot = by_artist.get(key) if key is not None else None
     if artist_snapshot is not None:
-        for name in (
-            "prior_artist_log_play_count",
-            "prior_artist_outcome_coverage",
-            "prior_artist_positive_rate",
-        ):
-            index = BEHAVIOR_FEATURE_NAMES.index(name)
+        for index in _ARTIST_BEHAVIOR_INDICES:
             values[index] = artist_snapshot.behavior_features[index]
     return tuple(values)
 
@@ -276,16 +303,23 @@ def _novelty(behavior: Sequence[float]) -> float:
 
 
 def _run_identifier(
-    candidates: Sequence[CandidateTrack],
     seeds: Mapping[str, float],
-    profile_name: str,
-    profile_version: str,
+    profile_name: str | None,
+    profile_version: str | None,
     model_id: str | None,
     taste_map_model_id: str | None,
     config: RecommendationConfig,
+    *,
+    candidate_digest: str,
+    feature_digest: str,
+    behavior_snapshot_digest: str,
+    taste_map_assignment_digest: str,
 ) -> str:
     record = {
-        "candidate_ids": sorted(candidate.track_id for candidate in candidates),
+        "candidate_digest": candidate_digest,
+        "feature_digest": feature_digest,
+        "behavior_snapshot_digest": behavior_snapshot_digest,
+        "taste_map_assignment_digest": taste_map_assignment_digest,
         "seeds": dict(sorted(seeds.items())),
         "profile_name": profile_name,
         "profile_version": profile_version,
@@ -304,6 +338,12 @@ def _run_identifier(
             seed_cluster_counts={},
             profile_name=profile_name,
             profile_version=profile_version,
+            candidate_digest=candidate_digest,
+            feature_digest=feature_digest,
+            behavior_snapshot_digest=behavior_snapshot_digest,
+            taste_map_assignment_digest=taste_map_assignment_digest,
+            behavior_dataset_version=None,
+            behavior_snapshot_as_of=None,
             config=config,
         ).to_dict()["ranking_config"],
     }
@@ -311,12 +351,26 @@ def _run_identifier(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _content_digest(records: Iterable[Mapping[str, object]]) -> str:
+    digest = hashlib.sha256()
+    for record in records:
+        canonical = json.dumps(
+            record,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        digest.update(canonical.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
 def rank_candidates(
     candidates: Iterable[CandidateTrack],
     observations: Iterable[FeatureObservation],
     *,
-    profile: AudioFeatureProfile,
-    profile_name: str,
+    profile: AudioFeatureProfile | None = None,
+    profile_name: str | None = None,
     seed_weights: Mapping[str, float] | None = None,
     model: LinearTasteModel | None = None,
     behavior_snapshots: Iterable[BehaviorSnapshot] = (),
@@ -330,20 +384,33 @@ def rank_candidates(
     candidate_rows = tuple(candidates)
     if not candidate_rows or top_k < 1:
         raise RecommendationError("Candidates and top_k must be non-empty and positive")
-    catalog = ProfiledFeatureCatalog(observations, profile)
+    candidate_ids = [candidate.track_id for candidate in candidate_rows]
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise RecommendationError("Candidates contain duplicate track IDs")
+    observation_rows = tuple(observations)
+    if (profile is None) != (profile_name is None):
+        raise RecommendationError("Audio profile and profile_name must be supplied together")
+    if profile is None and observation_rows:
+        raise RecommendationError("Feature observations require an audio profile")
+    catalog = ProfiledFeatureCatalog(observation_rows, profile) if profile is not None else None
     seeds = dict(seed_weights or {})
-    if seeds and profile.embedding_input is None:
+    if seeds and (profile is None or profile.embedding_input is None):
         raise RecommendationError("Seed similarity requires an embedding profile")
     if (
         model is not None
         and (model.includes_descriptors or model.includes_embedding)
-        and (model.profile_name != profile_name or model.profile_version != profile.profile_version)
+        and (
+            profile is None
+            or model.profile_name != profile_name
+            or model.profile_version != profile.profile_version
+        )
     ):
         raise RecommendationError("Taste model and selected audio profile do not match")
     query_vector: tuple[float, ...] | None = None
     if seeds:
         seed_vectors = []
         for track_id, weight in seeds.items():
+            assert catalog is not None
             representation = catalog.get(track_id)
             if representation is None or representation.embedding is None:
                 raise RecommendationError(f"Seed track lacks the selected embedding: {track_id}")
@@ -353,10 +420,33 @@ def rank_candidates(
     snapshot_by_track = {snapshot.track_id: snapshot for snapshot in snapshots}
     if len(snapshot_by_track) != len(snapshots):
         raise RecommendationError("Behavior snapshots contain duplicate track IDs")
-    snapshot_by_artist = {
-        snapshot.artist_key: snapshot for snapshot in snapshots if snapshot.artist_key is not None
-    }
+    snapshot_versions = {snapshot.dataset_version for snapshot in snapshots}
+    snapshot_times = {snapshot.as_of for snapshot in snapshots}
+    if len(snapshot_versions) > 1 or len(snapshot_times) > 1:
+        raise RecommendationError("Behavior snapshots must share one dataset version and as_of")
+    behavior_dataset_version = next(iter(snapshot_versions), None)
+    behavior_snapshot_as_of = next(iter(snapshot_times), None)
+    if (
+        model is not None
+        and model.includes_behavior
+        and behavior_dataset_version is not None
+        and model.dataset_version != behavior_dataset_version
+    ):
+        raise RecommendationError("Taste model and behavior snapshots use different datasets")
+    snapshot_by_artist: dict[str, BehaviorSnapshot] = {}
+    for snapshot in snapshots:
+        if snapshot.artist_key is None:
+            continue
+        previous = snapshot_by_artist.get(snapshot.artist_key)
+        if previous is not None and any(
+            previous.behavior_features[index] != snapshot.behavior_features[index]
+            for index in _ARTIST_BEHAVIOR_INDICES
+        ):
+            raise RecommendationError("Behavior snapshots disagree on shared artist features")
+        snapshot_by_artist[snapshot.artist_key] = snapshot
     assignment_rows = tuple(cluster_assignments)
+    if profile is None and assignment_rows:
+        raise RecommendationError("Taste-map assignments require an audio profile")
     assignment_by_track = {assignment.track_id: assignment for assignment in assignment_rows}
     if len(assignment_by_track) != len(assignment_rows):
         raise RecommendationError("Taste-map assignments contain duplicate track IDs")
@@ -365,25 +455,51 @@ def rank_candidates(
         raise RecommendationError("Taste-map assignments mix model IDs")
     if any(
         assignment.profile_name != profile_name
+        or profile is None
         or assignment.profile_version != profile.profile_version
         for assignment in assignment_rows
     ):
         raise RecommendationError("Taste-map assignments and audio profile do not match")
     taste_map_model_id = next(iter(taste_map_model_ids), None)
+    candidate_digest = _content_digest(
+        candidate.to_dict() for candidate in sorted(candidate_rows, key=lambda item: item.track_id)
+    )
+    feature_digest = _content_digest(
+        observation.to_dict()
+        for observation in sorted(
+            observation_rows,
+            key=lambda item: (
+                item.track_id,
+                item.feature_name,
+                item.feature_source,
+                item.source_version,
+            ),
+        )
+    )
+    behavior_snapshot_digest = _content_digest(
+        snapshot.to_dict() for snapshot in sorted(snapshots, key=lambda item: item.track_id)
+    )
+    taste_map_assignment_digest = _content_digest(
+        assignment.to_dict()
+        for assignment in sorted(assignment_rows, key=lambda item: item.track_id)
+    )
     run_id = _run_identifier(
-        candidate_rows,
         seeds,
         profile_name,
-        profile.profile_version,
+        profile.profile_version if profile is not None else None,
         model.model_id if model is not None else None,
         taste_map_model_id,
         active,
+        candidate_digest=candidate_digest,
+        feature_digest=feature_digest,
+        behavior_snapshot_digest=behavior_snapshot_digest,
+        taste_map_assignment_digest=taste_map_assignment_digest,
     )
     scored: list[_ScoredCandidate] = []
     for candidate in candidate_rows:
         behavior = _behavior_for_candidate(candidate, snapshot_by_track, snapshot_by_artist)
         novelty = _novelty(behavior)
-        representation = catalog.get(candidate.track_id)
+        representation = catalog.get(candidate.track_id) if catalog is not None else None
         similarity = None
         if (
             query_vector is not None
@@ -428,9 +544,14 @@ def rank_candidates(
         if preference is not None:
             numerator += active.predicted_preference_weight * preference
             denominator += active.predicted_preference_weight
+        novelty_weight = (
+            active.novelty_bonus_weight
+            if similarity is not None
+            else active.preference_only_novelty_bonus_weight
+        )
         if tier != "metadata_only":
-            numerator += active.novelty_bonus_weight * novelty
-            denominator += active.novelty_bonus_weight
+            numerator += novelty_weight * novelty
+            denominator += novelty_weight
         base_score = numerator / denominator if denominator else None
         exclusion_reason = None
         if candidate.track_id in seeds:
@@ -573,7 +694,13 @@ def rank_candidates(
         taste_map_model_id=taste_map_model_id,
         seed_cluster_counts=dict(seed_cluster_counts),
         profile_name=profile_name,
-        profile_version=profile.profile_version,
+        profile_version=profile.profile_version if profile is not None else None,
+        candidate_digest=candidate_digest,
+        feature_digest=feature_digest,
+        behavior_snapshot_digest=behavior_snapshot_digest,
+        taste_map_assignment_digest=taste_map_assignment_digest,
+        behavior_dataset_version=behavior_dataset_version,
+        behavior_snapshot_as_of=behavior_snapshot_as_of,
         config=active,
     )
     assert_privacy_safe(report.to_dict())
