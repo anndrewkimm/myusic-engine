@@ -56,6 +56,37 @@ class PredictionMetrics:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class PairedRankingComparison:
+    """Paired period-level NDCG lift with a deterministic bootstrap interval."""
+
+    baseline_model_name: str
+    contender_model_name: str
+    split: str
+    period_count: int
+    mean_ndcg_delta: float
+    confidence_level: float
+    confidence_interval_low: float
+    confidence_interval_high: float
+    contender_win_rate: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "baseline_model_name": self.baseline_model_name,
+            "contender_model_name": self.contender_model_name,
+            "split": self.split,
+            "metric": "ndcg_at_k",
+            "period_count": self.period_count,
+            "mean_delta": self.mean_ndcg_delta,
+            "confidence_level": self.confidence_level,
+            "confidence_interval": [
+                self.confidence_interval_low,
+                self.confidence_interval_high,
+            ],
+            "contender_win_rate": self.contender_win_rate,
+        }
+
+
 def _rounded(value: float) -> float:
     return round(float(value), 8)
 
@@ -161,4 +192,83 @@ def evaluate_predictions(
         precision_at_k=precision,
         recall_at_k=recall,
         ndcg_at_k=ndcg,
+    )
+
+
+def compare_paired_rankings(
+    labels: Sequence[int],
+    baseline_probabilities: Sequence[float],
+    contender_probabilities: Sequence[float],
+    period_indices: Sequence[int],
+    *,
+    baseline_model_name: str,
+    contender_model_name: str,
+    split: str,
+    ranking_k: int,
+    bootstrap_resamples: int = 10_000,
+    confidence_level: float = 0.95,
+    random_seed: int = 1729,
+) -> PairedRankingComparison:
+    """Compare aligned ranking models by resampling whole chronological periods."""
+
+    row_count = len(labels)
+    if (
+        row_count == 0
+        or len(baseline_probabilities) != row_count
+        or len(contender_probabilities) != row_count
+        or len(period_indices) != row_count
+    ):
+        raise EvaluationError("Paired ranking inputs must be non-empty and aligned")
+    if bootstrap_resamples < 1:
+        raise EvaluationError("bootstrap_resamples must be positive")
+    if not 0 < confidence_level < 1:
+        raise EvaluationError("confidence_level must be in (0, 1)")
+    if random_seed < 0:
+        raise EvaluationError("random_seed must be non-negative")
+
+    grouped_indices: dict[int, list[int]] = defaultdict(list)
+    for row_index, period_index in enumerate(period_indices):
+        grouped_indices[period_index].append(row_index)
+    deltas: list[float] = []
+    for period_index in sorted(grouped_indices):
+        indices = grouped_indices[period_index]
+        period_labels = [labels[index] for index in indices]
+        baseline = evaluate_predictions(
+            period_labels,
+            [baseline_probabilities[index] for index in indices],
+            [period_index] * len(indices),
+            ranking_k=ranking_k,
+        )
+        contender = evaluate_predictions(
+            period_labels,
+            [contender_probabilities[index] for index in indices],
+            [period_index] * len(indices),
+            ranking_k=ranking_k,
+        )
+        if baseline.ndcg_at_k is None or contender.ndcg_at_k is None:
+            continue
+        deltas.append(contender.ndcg_at_k - baseline.ndcg_at_k)
+    if not deltas:
+        raise EvaluationError("Paired ranking comparison has no periods with positive labels")
+
+    delta_array = np.asarray(deltas, dtype=np.float64)
+    generator = np.random.default_rng(random_seed)
+    sampled = generator.choice(
+        delta_array,
+        size=(bootstrap_resamples, len(delta_array)),
+        replace=True,
+    )
+    means = np.mean(sampled, axis=1)
+    tail = (1.0 - confidence_level) / 2.0
+    low, high = np.quantile(means, (tail, 1.0 - tail))
+    return PairedRankingComparison(
+        baseline_model_name=baseline_model_name,
+        contender_model_name=contender_model_name,
+        split=split,
+        period_count=len(deltas),
+        mean_ndcg_delta=_rounded(float(np.mean(delta_array))),
+        confidence_level=confidence_level,
+        confidence_interval_low=_rounded(float(low)),
+        confidence_interval_high=_rounded(float(high)),
+        contender_win_rate=_rounded(float(np.mean(delta_array > 0.0))),
     )

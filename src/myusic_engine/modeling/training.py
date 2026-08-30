@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from itertools import combinations
 from pathlib import Path
 from typing import Literal, TypeAlias, cast
 
@@ -15,7 +16,12 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-from myusic_engine.evaluation import PredictionMetrics, evaluate_predictions
+from myusic_engine.evaluation import (
+    PairedRankingComparison,
+    PredictionMetrics,
+    compare_paired_rankings,
+    evaluate_predictions,
+)
 from myusic_engine.features import FeatureObservation
 from myusic_engine.io import atomic_write_text
 from myusic_engine.modeling.config import AudioFeatureProfile, TasteModelConfig
@@ -211,6 +217,7 @@ class TasteTrainingReport:
     selected_model_name: str | None
     selected_model_id: str | None
     variants: tuple[VariantEvaluation, ...]
+    comparisons: tuple[PairedRankingComparison, ...]
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, object]:
@@ -225,10 +232,14 @@ class TasteTrainingReport:
             "descriptor_tracks": self.descriptor_tracks,
             "embedding_tracks": self.embedding_tracks,
             "fair_cohort_tracks": self.fair_cohort_tracks,
-            "selection_rule": "highest validation NDCG@K, then average precision; test untouched",
+            "selection_rule": (
+                "highest validation NDCG@K within the deployment cohort; prefer the simplest "
+                "model when paired period-bootstrap lift is not clearly positive; test untouched"
+            ),
             "selected_model_name": self.selected_model_name,
             "selected_model_id": self.selected_model_id,
             "variants": [variant.to_dict() for variant in self.variants],
+            "paired_period_comparisons": [comparison.to_dict() for comparison in self.comparisons],
         }
 
 
@@ -497,6 +508,109 @@ def _selection_key(evaluation: VariantEvaluation) -> tuple[float, float, str]:
     return (ndcg, average_precision, evaluation.model_name)
 
 
+def _paired_comparisons(
+    predictions: Sequence[TastePrediction],
+    evaluations: Sequence[VariantEvaluation],
+    config: TasteModelConfig,
+) -> tuple[PairedRankingComparison, ...]:
+    trained = [evaluation for evaluation in evaluations if evaluation.status == "trained"]
+    by_cohort: dict[str, list[str]] = defaultdict(list)
+    for evaluation in trained:
+        by_cohort[evaluation.cohort].append(evaluation.model_name)
+
+    pairs = [pair for cohort_names in by_cohort.values() for pair in combinations(cohort_names, 2)]
+
+    prediction_maps: dict[tuple[str, str], dict[str, TastePrediction]] = defaultdict(dict)
+    for prediction in predictions:
+        prediction_maps[(prediction.model_name, prediction.split)][prediction.sample_id] = (
+            prediction
+        )
+
+    comparisons_out: list[PairedRankingComparison] = []
+    for baseline_name, contender_name in pairs:
+        for split in ("validation", "test"):
+            baseline = prediction_maps[(baseline_name, split)]
+            contender = prediction_maps[(contender_name, split)]
+            if set(baseline) != set(contender):
+                raise TasteTrainingError(
+                    "Paired model comparison requires identical held-out samples"
+                )
+            ordered_ids = sorted(
+                baseline,
+                key=lambda sample_id: (
+                    baseline[sample_id].period_index,
+                    sample_id,
+                ),
+            )
+            if any(
+                baseline[sample_id].label != contender[sample_id].label
+                or baseline[sample_id].period_index != contender[sample_id].period_index
+                for sample_id in ordered_ids
+            ):
+                raise TasteTrainingError("Paired model comparison labels do not align")
+            comparisons_out.append(
+                compare_paired_rankings(
+                    [baseline[sample_id].label for sample_id in ordered_ids],
+                    [baseline[sample_id].probability for sample_id in ordered_ids],
+                    [contender[sample_id].probability for sample_id in ordered_ids],
+                    [baseline[sample_id].period_index for sample_id in ordered_ids],
+                    baseline_model_name=baseline_name,
+                    contender_model_name=contender_name,
+                    split=split,
+                    ranking_k=config.ranking_k,
+                    random_seed=config.random_seed,
+                )
+            )
+    return tuple(comparisons_out)
+
+
+def _best_minus_candidate_interval_low(
+    comparisons: Sequence[PairedRankingComparison],
+    *,
+    best_model_name: str,
+    candidate_model_name: str,
+) -> float | None:
+    for comparison in comparisons:
+        if comparison.split != "validation":
+            continue
+        if (
+            comparison.baseline_model_name == candidate_model_name
+            and comparison.contender_model_name == best_model_name
+        ):
+            return comparison.confidence_interval_low
+        if (
+            comparison.baseline_model_name == best_model_name
+            and comparison.contender_model_name == candidate_model_name
+        ):
+            return -comparison.confidence_interval_high
+    return None
+
+
+def _select_evaluation(
+    evaluations: Sequence[VariantEvaluation],
+    comparisons: Sequence[PairedRankingComparison],
+) -> VariantEvaluation:
+    best = max(evaluations, key=_selection_key)
+    statistically_tied = [best]
+    for candidate in evaluations:
+        if candidate.model_name == best.model_name or candidate.feature_count >= best.feature_count:
+            continue
+        lift_interval_low = _best_minus_candidate_interval_low(
+            comparisons,
+            best_model_name=best.model_name,
+            candidate_model_name=candidate.model_name,
+        )
+        if lift_interval_low is not None and lift_interval_low <= 0.0:
+            statistically_tied.append(candidate)
+    minimum_features = min(evaluation.feature_count for evaluation in statistically_tied)
+    simplest = [
+        evaluation
+        for evaluation in statistically_tied
+        if evaluation.feature_count == minimum_features
+    ]
+    return max(simplest, key=_selection_key)
+
+
 def train_taste_models(
     samples: Iterable[TemporalTasteSample],
     *,
@@ -543,7 +657,14 @@ def train_taste_models(
     trained_evaluations = [
         evaluation for evaluation in evaluations if evaluation.status == "trained"
     ]
-    selected_evaluation = max(trained_evaluations, key=_selection_key)
+    deployment_cohort = "audio_matched" if catalog is not None else "all_labeled"
+    deployment_evaluations = [
+        evaluation for evaluation in trained_evaluations if evaluation.cohort == deployment_cohort
+    ]
+    if not deployment_evaluations:
+        deployment_evaluations = trained_evaluations
+    comparisons = _paired_comparisons(predictions, evaluations, active)
+    selected_evaluation = _select_evaluation(deployment_evaluations, comparisons)
     selected_model = next(
         model for model in models if model.model_id == selected_evaluation.model_id
     )
@@ -560,6 +681,7 @@ def train_taste_models(
         selected_model_name=selected_model.model_name,
         selected_model_id=selected_model.model_id,
         variants=tuple(evaluations),
+        comparisons=comparisons,
     )
     assert_privacy_safe(report.to_dict())
     return TasteTrainingResult(models=tuple(models), predictions=tuple(predictions), report=report)
