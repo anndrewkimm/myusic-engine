@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/external-identity-match-v1.json",
+  "title": "Provider-backed MusicBrainz identity decision",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_version",
+    "source_track_id",
+    "play_count",
+    "total_ms_played",
+    "match_status",
+    "match_method",
+    "artist_mbids",
+    "provider",
+    "review_required"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "policy_version": { "type": "string", "minLength": 1 },
+    "source_track_id": { "type": "string", "minLength": 1 },
+    "source_track_uri": { "type": ["string", "null"] },
+    "track_name": { "type": ["string", "null"] },
+    "artist_name": { "type": ["string", "null"] },
+    "album_name": { "type": ["string", "null"] },
+    "play_count": { "type": "integer", "minimum": 0 },
+    "total_ms_played": { "type": "integer", "minimum": 0 },
+    "match_status": { "enum": ["exact", "fuzzy", "ambiguous", "unmatched"] },
+    "match_method": {
+      "enum": [
+        "exact_title_artist_release",
+        "exact_title_artist",
+        "provider_fuzzy",
+        "provider_unmatched"
+      ]
+    },
+    "recording_mbid": { "type": ["string", "null"] },
+    "release_mbid": { "type": ["string", "null"] },
+    "artist_mbids": { "type": "array", "items": { "type": "string" } },
+    "provider": { "type": "string", "minLength": 1 },
+    "provider_confidence": { "$ref": "#/$defs/nullableRate" },
+    "match_confidence": { "$ref": "#/$defs/nullableRate" },
+    "mapped_recording_name": { "type": ["string", "null"] },
+    "mapped_artist_name": { "type": ["string", "null"] },
+    "mapped_release_name": { "type": ["string", "null"] },
+    "review_required": { "type": "boolean" }
+  },
+  "$defs": {
+    "nullableRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": false
+}

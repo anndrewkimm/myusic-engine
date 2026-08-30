@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/acoustic-feature-coverage-report-v1.json",
+  "title": "AcousticBrainz feature coverage report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "conversion_version",
+    "exact_tracks_considered",
+    "unique_recording_mbids",
+    "low_level_tracks_covered",
+    "high_level_tracks_covered",
+    "low_level_track_rate",
+    "high_level_track_rate",
+    "low_level_play_rate",
+    "high_level_play_rate",
+    "low_level_ms_played_rate",
+    "high_level_ms_played_rate",
+    "observations_written",
+    "feature_counts"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "conversion_version": { "type": "string", "minLength": 1 },
+    "exact_tracks_considered": { "type": "integer", "minimum": 0 },
+    "unique_recording_mbids": { "type": "integer", "minimum": 0 },
+    "low_level_tracks_covered": { "type": "integer", "minimum": 0 },
+    "high_level_tracks_covered": { "type": "integer", "minimum": 0 },
+    "low_level_track_rate": { "$ref": "#/$defs/rate" },
+    "high_level_track_rate": { "$ref": "#/$defs/rate" },
+    "low_level_play_rate": { "$ref": "#/$defs/rate" },
+    "high_level_play_rate": { "$ref": "#/$defs/rate" },
+    "low_level_ms_played_rate": { "$ref": "#/$defs/rate" },
+    "high_level_ms_played_rate": { "$ref": "#/$defs/rate" },
+    "observations_written": { "type": "integer", "minimum": 0 },
+    "feature_counts": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  },
+  "$defs": {
+    "rate": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": false
+}

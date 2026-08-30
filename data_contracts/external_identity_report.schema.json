@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/external-identity-report-v1.json",
+  "title": "Provider-backed identity coverage report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "policy_version",
+    "provider",
+    "queries_available",
+    "queries_processed",
+    "exact_count",
+    "review_required_count",
+    "status_counts",
+    "status_rates",
+    "history_play_count",
+    "exact_play_count",
+    "exact_play_rate",
+    "history_ms_played",
+    "exact_ms_played",
+    "exact_ms_played_rate"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "policy_version": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "queries_available": { "type": "integer", "minimum": 0 },
+    "queries_processed": { "type": "integer", "minimum": 0 },
+    "exact_count": { "type": "integer", "minimum": 0 },
+    "review_required_count": { "type": "integer", "minimum": 0 },
+    "status_counts": { "$ref": "#/$defs/statusCounts" },
+    "status_rates": { "$ref": "#/$defs/statusRates" },
+    "history_play_count": { "type": "integer", "minimum": 0 },
+    "exact_play_count": { "type": "integer", "minimum": 0 },
+    "exact_play_rate": { "$ref": "#/$defs/rate" },
+    "history_ms_played": { "type": "integer", "minimum": 0 },
+    "exact_ms_played": { "type": "integer", "minimum": 0 },
+    "exact_ms_played_rate": { "$ref": "#/$defs/rate" }
+  },
+  "$defs": {
+    "rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "statusCounts": {
+      "type": "object",
+      "required": ["exact", "fuzzy", "ambiguous", "unmatched"],
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "statusRates": {
+      "type": "object",
+      "required": ["exact", "fuzzy", "ambiguous", "unmatched"],
+      "additionalProperties": { "$ref": "#/$defs/rate" }
+    }
+  },
+  "additionalProperties": false
+}
