@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/taste-map-assignment-v1.json",
+  "title": "Taste-map track assignment",
+  "type": "object",
+  "required": [
+    "schema_version", "track_id", "cluster_id", "is_noise", "cluster_confidence",
+    "distance_to_cluster_centroid", "projection_x", "projection_y", "model_id",
+    "profile_name", "profile_version"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "track_id": { "type": "string", "minLength": 1 },
+    "cluster_id": { "type": "integer", "minimum": -1 },
+    "is_noise": { "type": "boolean" },
+    "cluster_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "distance_to_cluster_centroid": { "type": ["number", "null"], "minimum": 0 },
+    "projection_x": { "type": "number" },
+    "projection_y": { "type": "number" },
+    "model_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "profile_name": { "type": "string", "minLength": 1 },
+    "profile_version": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}
