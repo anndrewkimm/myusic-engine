@@ -48,8 +48,14 @@ Python 3.11 or newer is required.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python -m pytest
+python -m pytest --cov=myusic_engine --cov-fail-under=75
+python -m ruff check .
+python -m ruff format --check .
+python -m mypy
 ```
+
+The same gates run on Python 3.11 and 3.14 in GitHub Actions; the current runtime also builds the
+wheel so packaging regressions fail before merge.
 
 Install the optional phase-3 stack when extracting real audio:
 
@@ -197,6 +203,18 @@ ablation metrics stay under ignored private paths. See
 
 ## Build the taste map and rank candidates
 
+The behavior model can rank immediately without any audio files:
+
+```powershell
+python -m myusic_engine rank-candidates `
+  "data/private/candidates.csv" `
+  --model "data/processed/models/behavior/selected_model.json" `
+  --behavior-snapshots "data/processed/modeling/behavior_snapshots.jsonl" `
+  --output-dir "data/processed/recommendations/behavior"
+```
+
+When lawful audio representations are available, add acoustic similarity and cluster context:
+
 ```powershell
 python -m myusic_engine build-taste-map `
   --features "data/processed/audio/features.jsonl" `
@@ -217,7 +235,9 @@ python -m myusic_engine rank-candidates `
 
 Candidate input can be CSV, JSON Lines, or a text file of Spotify track URIs/URLs. Results retain
 separate acoustic similarity, predicted preference, novelty, and artist-diversity components.
-Tracks without selected audio are explicitly marked `metadata_only`. The ordered
+Behavior-only model results are labeled `preference_ranked`; tracks without either model or audio
+coverage are explicitly marked `metadata_only`. Every run ID hashes the exact candidate metadata,
+feature observations, behavior snapshots, cluster assignments, model, and configuration. The ordered
 `spotify_playlist_uris.txt` is the safe handoff until the user explicitly authorizes an official
 Spotify OAuth playlist operation.
 

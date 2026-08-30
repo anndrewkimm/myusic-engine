@@ -24,9 +24,11 @@ confidence. Objective and embedding confidence remain separate from identity-mat
 
 ## Objective DSP feature set v1
 
-Objective DSP v0.2.0 analyzes mono 44.1 kHz audio with a 4,096-sample Hann window and 1,024-sample
-hop. Rhythm analysis uses a 2,048-sample frame and 512-sample hop. Configuration changes that alter
-values require a new `source_version`.
+Objective DSP v0.3.0 analyzes mono 44.1 kHz audio with a 4,096-sample Hann window and 1,024-sample
+hop. Rhythm analysis uses a 2,048-sample frame and 512-sample hop. Leading and trailing frames more
+than 60 dB below the peak are trimmed, and aggregate spectral/timbre statistics use active frames so
+padding silence cannot manufacture extreme values or artificial confidence. Configuration changes
+that alter values require a new `source_version`.
 
 | Feature | Definition | Main limitation |
 |---|---|---|
@@ -128,11 +130,13 @@ Automated synthetic tests currently verify:
 - real ONNX Runtime inference using the pinned model on a generated signal.
 - verified ONNX inference through all six pinned classifier heads;
 - rhythm abstention on a stationary tone that previously produced a false tempo.
+- independent tempo/key responses to controlled rhythmic and pitch perturbations;
+- stability under leading/trailing silence and expected compression/noise directions.
 
 ## Required before phase-3 exit
 
 1. Run on a permitted real-music corpus such as a compatible FMA subset or owned files.
-2. Add time-stretch, pitch-shift, bass-EQ, compression, silence, and codec transformation tests.
+2. Add real-codec and excerpt-versus-full-track transformation tests.
 3. Create human-reviewed similar/dissimilar pairs, including rhythm-only and timbre-only matches.
 4. Measure Recall@K / nDCG@K on those pairs and compare embeddings against handcrafted features.
 5. Inspect nearest neighbors across genres and underrepresented music for obvious failure modes.

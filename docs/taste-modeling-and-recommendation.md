@@ -20,9 +20,11 @@ artist-familiarity features are computed from events before `period_start`. Only
 in that target period is created does the state update. Entire periods, rather than random rows,
 are assigned to train, validation, or test.
 
-The standard scaler and logistic coefficients fit on training rows only. The selected model is the
-variant with the best validation NDCG@K, breaking ties with validation average precision. Test
-metrics are reported after selection and are never used to switch models.
+The standard scaler and logistic coefficients fit on training rows only. Selection starts with the
+best validation NDCG@K inside one deployment cohort, breaking ties with validation average
+precision. A more complex variant is retained only when its paired period-bootstrap validation lift
+over a simpler candidate is clearly positive. Test metrics are reported after selection and are
+never used to switch models.
 
 ## Audio ablations
 
@@ -46,7 +48,9 @@ flags, profile version, and a SHA-256 content ID.
 
 Validation and test reports include ROC AUC, average precision, log loss, Brier score, calibration
 error, and per-period Precision@K, Recall@K, and NDCG@K. A one-class held-out split retains valid
-calibration/ranking metrics and reports discrimination metrics as null.
+calibration/ranking metrics and reports discrimination metrics as null. Model ablations also report
+paired mean NDCG lift, period win rate, and a deterministic 95% bootstrap interval that resamples
+whole periods rather than pretending individual track rows are independent.
 
 ## Taste map and final rank
 
@@ -62,7 +66,15 @@ Final candidate ranking keeps four pieces visible:
 3. novelty from current track history; and
 4. a greedy repeated-artist penalty and maximum-per-artist constraint.
 
+The audio-ranked and preference-only novelty bonuses are configured independently. Preference-only
+novelty defaults to zero because a 101-point chronological validation sweep did not show a clear
+period-bootstrap ranking lift over the selected behavior model alone. This keeps discovery as an
+explicit product choice instead of letting a missing audio component silently triple novelty's
+relative weight.
+
 Missing components are never silently zero-filled and treated as measurements. Audio-covered,
 preference-only, and metadata-only candidates receive distinct tiers. Every run has a deterministic
-ID, exact model/profile versions, per-result explanations, an ordered Spotify URI handoff, and an
-append-only explicit-feedback log.
+ID over the exact candidate, feature, behavior-snapshot, cluster, model, and configuration inputs;
+exact model/profile versions; per-result explanations; an ordered Spotify URI handoff; and an
+append-only explicit-feedback log. A behavior-only model can rank immediately without selecting a
+dummy audio profile or supplying an empty feature file.

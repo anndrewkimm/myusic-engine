@@ -18,11 +18,12 @@ retained Spotify URI identities for all normalized tracks, confirmed the expecte
 signals, and removed sensitive network fields from normalized output. Exact counts and listening
 patterns remain in ignored local reports and tables.
 
-Phase 2 now supports a precision-first public mapping route: title, artist, and optional album can
-be sent to the ListenBrainz mapper; only strict exact matches receive MusicBrainz recording IDs;
-fuzzy and unmatched responses remain review-only. Provider responses are cached and offline mode
-forbids cache misses. The live private-data run remains paused until the user explicitly approves
-sending that limited metadata.
+Phase 2 now supports a precision-first public mapping route through the current ListenBrainz Labs
+artist/recording and artist/recording/release endpoints. A public control lookup and its matching
+AcousticBrainz low/high-level fetch passed live; only strict exact metadata matches receive
+MusicBrainz recording IDs. Provider responses are cached, bounded, retry-safe, and replayable
+offline. The private-data run remains paused until the user explicitly approves sending that
+limited title/artist/album metadata.
 
 Phase 2 and phase 3 meet at `track_id`, but phase 3 can proceed independently. For a recording that
 already has a Spotify track URI, the private audio manifest can use that URI directly. For another
@@ -49,8 +50,12 @@ embedding still requires a waveform the user owns or otherwise has permission to
 The phase-5 implementation creates non-overlapping target periods, freezes behavior before each
 period, abstains on ambiguous outcomes, and reserves whole later periods for validation and test.
 It compares repeat/recency, artist, full behavior, descriptor, embedding, and combined variants;
-all audio comparisons use the same covered cohort. A private real-history behavior run is complete,
-while its detailed metrics and predictions remain ignored rather than being committed.
+all audio comparisons use the same covered cohort. Paired bootstrap intervals resample whole
+periods, and model selection prefers the simpler variant when a validation lift is uncertain. The
+private real-history sweep retained the 90-day period and default regularization, selected the
+artist baseline over an uncertain full-behavior lift, and left preference-only novelty disabled by
+default after a 101-point validation sweep. Detailed metrics and predictions remain ignored rather
+than being committed.
 
 The engine deliberately does not emit Spotify-named `danceability`, `energy`, `valence`,
 `acousticness`, `speechiness`, or `instrumentalness` values. Learned outputs use custom
