@@ -10,7 +10,9 @@ from pathlib import Path, PurePosixPath
 from typing import TextIO, cast
 from zipfile import BadZipFile, ZipFile
 
+from myusic_engine.io import atomic_write_text
 from myusic_engine.matching.models import (
+    AccountPlaylist,
     CatalogLoadResult,
     CatalogTrack,
     IdentityInputError,
@@ -169,6 +171,92 @@ def _playlist_tracks(payload: Mapping[str, object], source_file: str) -> Iterabl
                 source_file=source_file,
                 source_collection="playlist",
             )
+
+
+def load_account_playlist(source: str | Path, playlist_name: str) -> AccountPlaylist:
+    """Load one exactly named playlist from a private Spotify account-data export."""
+
+    if not isinstance(playlist_name, str) or not playlist_name.strip():
+        raise IdentityInputError("Playlist name must be non-empty text")
+    requested_name = playlist_name.strip()
+    matches: list[AccountPlaylist] = []
+    for source_file, payload in _source_documents(Path(source)):
+        if source_file.casefold() == "yourlibrary.json":
+            continue
+        for playlist_index, raw_playlist in enumerate(
+            _records(payload.get("playlists"), label="playlists")
+        ):
+            playlist_label = f"{source_file} playlist {playlist_index}"
+            if not isinstance(raw_playlist, Mapping):
+                raise IdentityInputError(f"{playlist_label} must be an object")
+            playlist = cast(Mapping[str, object], raw_playlist)
+            name = _required_text(playlist, "name", label=playlist_label)
+            if name.casefold() != requested_name.casefold():
+                continue
+            raw_items = _records(playlist.get("items"), label=f"{playlist_label} items")
+            tracks: list[CatalogTrack] = []
+            seen_uris: set[str] = set()
+            non_tracks = 0
+            duplicates = 0
+            for item_index, raw_item in enumerate(raw_items):
+                item_label = f"{playlist_label} item {item_index}"
+                if not isinstance(raw_item, Mapping):
+                    raise IdentityInputError(f"{item_label} must be an object")
+                raw_track = raw_item.get("track")
+                if raw_track is None:
+                    non_tracks += 1
+                    continue
+                if not isinstance(raw_track, Mapping):
+                    raise IdentityInputError(f"{item_label} track must be an object")
+                track = cast(Mapping[str, object], raw_track)
+                uri = _validated_uri(
+                    _required_text(track, "trackUri", label=item_label), label=item_label
+                )
+                if uri in seen_uris:
+                    duplicates += 1
+                    continue
+                seen_uris.add(uri)
+                tracks.append(
+                    CatalogTrack(
+                        track_uri=uri,
+                        track_name=_required_text(track, "trackName", label=item_label),
+                        artist_name=_required_text(track, "artistName", label=item_label),
+                        album_name=_optional_text(track, "albumName", label=item_label),
+                        source_file=source_file,
+                        source_collection="playlist",
+                    )
+                )
+            last_modified_date = _optional_text(playlist, "lastModifiedDate", label=playlist_label)
+            matches.append(
+                AccountPlaylist(
+                    playlist_name=name,
+                    last_modified_date=last_modified_date,
+                    tracks=tuple(tracks),
+                    source_file=source_file,
+                    items_seen=len(raw_items),
+                    non_track_items_skipped=non_tracks,
+                    duplicate_tracks_removed=duplicates,
+                )
+            )
+    if not matches:
+        raise IdentityInputError("Account-data export does not contain the requested playlist")
+    if len(matches) > 1:
+        raise IdentityInputError(
+            "Account-data export contains multiple playlists with the requested name"
+        )
+    result = matches[0]
+    if not result.tracks:
+        raise IdentityInputError("Requested account-data playlist contains no Spotify tracks")
+    return result
+
+
+def write_account_playlist_report(playlist: AccountPlaylist, path: str | Path) -> Path:
+    """Write aggregate provenance for one local account-playlist import."""
+
+    return atomic_write_text(
+        path,
+        json.dumps(playlist.report_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+    )
 
 
 def load_account_catalog(source: str | Path) -> CatalogLoadResult:

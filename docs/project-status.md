@@ -11,7 +11,7 @@ still requires an approved external service or permitted real audio.
 | 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, pairwise sanity set, and retrieval-quality evaluation |
 | 4 — taste map and similarity | Standardized K-Means/HDBSCAN/PCA and retrieval implemented | Real lawful vectors and human retrieval sanity set |
 | 5 — personal preference ranker | Behavior baselines validated privately; audio ablations implemented | Lawful descriptor/embedding coverage and measured audio lift |
-| 6 — candidate intake/output | Local intake, explainable ranking, URI handoff, and feedback implemented | Real candidate features and explicit OAuth approval for live playlist mutation |
+| 6 — candidate intake/output | Local/account-export playlist intake, explainable ranking, URI handoff, feedback, and guarded private-playlist publication implemented | Real candidate features and an explicitly authorized live OAuth smoke test |
 
 Phase 1 validation read every discovered Extended History shard, rejected no malformed records,
 retained Spotify URI identities for all normalized tracks, confirmed the expected rich playback
@@ -61,3 +61,18 @@ The engine deliberately does not emit Spotify-named `danceability`, `energy`, `v
 `acousticness`, `speechiness`, or `instrumentalness` values. Learned outputs use custom
 `*_score_v1` names and remain uncalibrated until a permitted labeled corpus and held-out benchmark
 exist. Unsupported properties remain absent instead of being filled with invented heuristics.
+
+Phase 6 now includes a dry-run-first Spotify publisher aligned to the current `/me/playlists` and
+`/playlists/{playlist_id}/items` operations. It accepts OAuth material only from an environment
+variable, creates private playlists only, batches at the documented 100-item limit, and stores a
+secret-free receipt after each confirmed batch. On resume it reads the remote order and appends
+only when that order is an exact prefix of the deterministic plan. No live playlist was created
+during repository validation; that final smoke test still requires the user's explicit OAuth
+authorization.
+
+Named playlists from a private Spotify Account Data export can now become candidate JSON Lines
+directly, with no manual transcription and no OAuth call. The importer selects one exact
+case-insensitive playlist name, preserves its exported order and metadata, removes duplicate track
+URIs, counts skipped episodes/local items, and records the export snapshot date. A shared playlist
+link can therefore be matched to an existing private export snapshot before requesting live API
+access.

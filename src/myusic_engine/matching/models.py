@@ -67,6 +67,34 @@ class CatalogLoadResult:
 
 
 @dataclass(frozen=True, slots=True)
+class AccountPlaylist:
+    """One named playlist recovered from a private Spotify account-data export."""
+
+    playlist_name: str
+    last_modified_date: str | None
+    tracks: tuple[CatalogTrack, ...]
+    source_file: str
+    items_seen: int
+    non_track_items_skipped: int
+    duplicate_tracks_removed: int
+    schema_version: int = 1
+
+    def report_dict(self) -> dict[str, object]:
+        """Return aggregate import evidence without copying track metadata into the report."""
+
+        return {
+            "schema_version": self.schema_version,
+            "playlist_name": self.playlist_name,
+            "last_modified_date": self.last_modified_date,
+            "source_file": self.source_file,
+            "items_seen": self.items_seen,
+            "tracks_written": len(self.tracks),
+            "non_track_items_skipped": self.non_track_items_skipped,
+            "duplicate_tracks_removed": self.duplicate_tracks_removed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class MatchCandidate:
     """A catalog candidate retained as inspectable evidence."""
 

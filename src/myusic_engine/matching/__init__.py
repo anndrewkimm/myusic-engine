@@ -1,6 +1,10 @@
 """Track identity resolution."""
 
-from myusic_engine.matching.account_catalog import load_account_catalog
+from myusic_engine.matching.account_catalog import (
+    load_account_catalog,
+    load_account_playlist,
+    write_account_playlist_report,
+)
 from myusic_engine.matching.external import (
     ExternalIdentityMatch,
     ExternalIdentityPolicy,
@@ -12,6 +16,7 @@ from myusic_engine.matching.external import (
     write_external_identity_resolution,
 )
 from myusic_engine.matching.models import (
+    AccountPlaylist,
     CatalogLoadResult,
     CatalogTrack,
     IdentityInputError,
@@ -33,6 +38,7 @@ from myusic_engine.matching.resolver import (
 )
 
 __all__ = [
+    "AccountPlaylist",
     "CatalogLoadResult",
     "CatalogTrack",
     "ExternalIdentityMatch",
@@ -48,6 +54,7 @@ __all__ = [
     "MatchCandidate",
     "TrackQuery",
     "load_account_catalog",
+    "load_account_playlist",
     "load_identity_policy",
     "normalize_metadata",
     "external_review_sample",
@@ -58,4 +65,5 @@ __all__ = [
     "review_sample",
     "write_identity_resolution",
     "write_external_identity_resolution",
+    "write_account_playlist_report",
 ]

@@ -10,12 +10,14 @@ from myusic_engine.matching import (
     IdentityPolicy,
     TrackQuery,
     load_account_catalog,
+    load_account_playlist,
     load_identity_policy,
     read_track_queries,
     resolve_identities,
     review_sample,
     write_identity_resolution,
 )
+from myusic_engine.ranking import read_candidates
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRST_URI = "spotify:track:0000000000000000000001"
@@ -117,6 +119,43 @@ def test_account_catalog_reads_library_and_playlist_tracks_only(tmp_path: Path) 
         "saved_library",
         "playlist",
     }
+
+
+def test_named_account_playlist_becomes_rankable_candidates(tmp_path: Path) -> None:
+    archive_path = _write_account_catalog(tmp_path)
+    playlist = load_account_playlist(archive_path, "synthetic playlist")
+
+    assert playlist.playlist_name == "Synthetic Playlist"
+    assert playlist.items_seen == 4
+    assert playlist.non_track_items_skipped == 2
+    assert playlist.duplicate_tracks_removed == 0
+    assert [track.track_uri for track in playlist.tracks] == [FIRST_URI, FIFTH_URI]
+
+    output_dir = tmp_path / "playlist-import"
+    exit_code = main(
+        [
+            "import-account-playlist",
+            str(archive_path),
+            "--playlist-name",
+            "Synthetic Playlist",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert exit_code == 0
+    candidates = read_candidates(output_dir / "candidates.jsonl")
+    assert [candidate.track_id for candidate in candidates] == [FIRST_URI, FIFTH_URI]
+    report = json.loads(
+        (output_dir / "account_playlist_import_report.json").read_text(encoding="utf-8")
+    )
+    assert report["tracks_written"] == 2
+    assert report["non_track_items_skipped"] == 2
+
+
+def test_named_account_playlist_rejects_missing_name(tmp_path: Path) -> None:
+    with pytest.raises(IdentityInputError, match="does not contain"):
+        load_account_playlist(_write_account_catalog(tmp_path), "Not Here")
 
 
 def test_resolution_keeps_exact_fuzzy_ambiguous_and_unmatched_distinct(

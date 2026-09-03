@@ -5,11 +5,14 @@ from __future__ import annotations
 import csv
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
+
+from myusic_engine.io import atomic_write_text
+from myusic_engine.privacy import assert_privacy_safe
 
 _SPOTIFY_TRACK_ID = re.compile(r"^[A-Za-z0-9]{22}$")
 _SPOTIFY_TRACK_URI = re.compile(r"^spotify:track:([A-Za-z0-9]{22})$")
@@ -163,3 +166,21 @@ def read_candidates(path: str | Path) -> tuple[CandidateTrack, ...]:
             raise CandidateInputError(f"Duplicate candidate track_id: {candidate.track_id}")
         seen.add(candidate.track_id)
     return candidates
+
+
+def write_candidates(candidates: Sequence[CandidateTrack], path: str | Path) -> Path:
+    """Write an ordered, strictly validated private candidate JSON Lines file."""
+
+    normalized = tuple(_candidate(candidate.to_dict()) for candidate in candidates)
+    if not normalized:
+        raise CandidateInputError("Candidate output contains no tracks")
+    seen: set[str] = set()
+    lines: list[str] = []
+    for candidate in normalized:
+        if candidate.track_id in seen:
+            raise CandidateInputError(f"Duplicate candidate track_id: {candidate.track_id}")
+        seen.add(candidate.track_id)
+        record = candidate.to_dict()
+        assert_privacy_safe(record)
+        lines.append(json.dumps(record, ensure_ascii=False, sort_keys=True))
+    return atomic_write_text(path, "\n".join(lines) + "\n")

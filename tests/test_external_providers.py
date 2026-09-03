@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+import myusic_engine.providers as provider_module
+from myusic_engine.cli import main
 from myusic_engine.features import (
     fetch_acousticbrainz_features,
     read_feature_observations,
@@ -24,6 +26,7 @@ from myusic_engine.providers import (
     ListenBrainzMappingClient,
     ProviderError,
 )
+from myusic_engine.ranking import CandidateTrack, write_candidates
 
 FIRST_MBID = "00000000-0000-4000-8000-000000000001"
 SECOND_MBID = "00000000-0000-4000-8000-000000000002"
@@ -249,6 +252,63 @@ def test_external_mapping_limit_prioritizes_play_count() -> None:
     assert [match.source_track_id for match in result.matches] == ["spotify:track:high"]
     assert result.report.queries_available == 2
     assert result.report.queries_processed == 1
+
+
+def test_map_musicbrainz_cli_accepts_playlist_candidates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    candidates_path = write_candidates(
+        (
+            CandidateTrack(
+                track_id="spotify:track:1111111111111111111111",
+                spotify_uri="spotify:track:1111111111111111111111",
+                track_name="Exact Song",
+                artist_name="Synthetic Artist",
+                album_name="Exact Album",
+            ),
+            CandidateTrack(
+                track_id="local-missing",
+                track_name="Missing Song",
+                artist_name="Synthetic Artist",
+                album_name="Missing Album",
+            ),
+        ),
+        tmp_path / "candidates.jsonl",
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "JsonCacheTransport",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        provider_module,
+        "ListenBrainzMappingClient",
+        lambda transport: FakeMapper(),
+    )
+    output_dir = tmp_path / "mapped"
+
+    exit_code = main(
+        [
+            "map-musicbrainz",
+            str(candidates_path),
+            "--input-kind",
+            "candidates",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    assert exit_code == 0
+    matches = read_external_identity_matches(output_dir / "external_identity_matches.jsonl")
+    assert [match.source_track_id for match in matches] == [
+        "local-missing",
+        "spotify:track:1111111111111111111111",
+    ]
+    assert [match.match_status for match in matches] == ["unmatched", "exact"]
+    assert all(match.play_count == 1 for match in matches)
+    assert "50.0% of processed candidate tracks" in capsys.readouterr().out
 
 
 def _exact_match(track_id: str, mbid: str, play_count: int) -> ExternalIdentityMatch:

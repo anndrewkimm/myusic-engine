@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/spotify-playlist-receipt-v1.json",
+  "title": "Resumable private Spotify playlist publication receipt",
+  "type": "object",
+  "required": [
+    "schema_version", "plan_id", "playlist_id", "playlist_uri", "playlist_url",
+    "requested_item_count", "confirmed_item_count", "status", "latest_snapshot_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "playlist_id": { "type": "string", "pattern": "^[A-Za-z0-9]{1,128}$" },
+    "playlist_uri": { "type": "string", "pattern": "^spotify:playlist:[A-Za-z0-9]{1,128}$" },
+    "playlist_url": { "type": ["string", "null"] },
+    "requested_item_count": { "type": "integer", "minimum": 1 },
+    "confirmed_item_count": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["created", "publishing", "complete"] },
+    "latest_snapshot_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

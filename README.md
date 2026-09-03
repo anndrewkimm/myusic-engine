@@ -134,6 +134,16 @@ python -m myusic_engine fetch-acousticbrainz `
   --cache-dir "data/raw/provider-cache"
 ```
 
+The same fallback can be scoped to one imported playlist instead of the full history:
+
+```powershell
+python -m myusic_engine map-musicbrainz `
+  "data/processed/candidates/my-playlist/candidates.jsonl" `
+  --input-kind candidates `
+  --output-dir "data/interim/musicbrainz/my-playlist" `
+  --cache-dir "data/raw/provider-cache"
+```
+
 Only strict exact mapper results receive MBIDs. Fuzzy and unmatched results remain review-only.
 The mapper cache is resumable and `--offline` forbids network requests. AcousticBrainz supplies
 lawful historical descriptors and learned scores, but it does not replace a deep track embedding.
@@ -205,9 +215,20 @@ ablation metrics stay under ignored private paths. See
 
 The behavior model can rank immediately without any audio files:
 
+If the candidate songs are already in a playlist captured by the private Spotify Account Data
+export, import that playlist directly. This preserves its track metadata and requires neither
+manual CSV entry nor OAuth:
+
+```powershell
+python -m myusic_engine import-account-playlist `
+  "data/private/my_spotify_data.zip" `
+  --playlist-name "My playlist" `
+  --output-dir "data/processed/candidates/my-playlist"
+```
+
 ```powershell
 python -m myusic_engine rank-candidates `
-  "data/private/candidates.csv" `
+  "data/processed/candidates/my-playlist/candidates.jsonl" `
   --model "data/processed/models/behavior/selected_model.json" `
   --behavior-snapshots "data/processed/modeling/behavior_snapshots.jsonl" `
   --output-dir "data/processed/recommendations/behavior"
@@ -233,13 +254,16 @@ python -m myusic_engine rank-candidates `
   --output-dir "data/processed/recommendations"
 ```
 
-Candidate input can be CSV, JSON Lines, or a text file of Spotify track URIs/URLs. Results retain
-separate acoustic similarity, predicted preference, novelty, and artist-diversity components.
+Candidate input can be an exactly named account-export playlist, CSV, JSON Lines, or a text file of
+Spotify track URIs/URLs. Duplicate playlist tracks are removed in first-seen order and non-track
+items are counted in an aggregate import report. Results retain separate acoustic similarity,
+predicted preference, novelty, and artist-diversity components.
 Behavior-only model results are labeled `preference_ranked`; tracks without either model or audio
 coverage are explicitly marked `metadata_only`. Every run ID hashes the exact candidate metadata,
 feature observations, behavior snapshots, cluster assignments, model, and configuration. The ordered
-`spotify_playlist_uris.txt` is the safe handoff until the user explicitly authorizes an official
-Spotify OAuth playlist operation.
+`spotify_playlist_uris.txt` remains the safe local handoff. An optional command can turn that file
+into a reviewed, deterministic publication plan and—only with an explicit execution flag and a
+user-authorized OAuth token—a private Spotify playlist.
 
 Record an outcome without rewriting earlier run artifacts:
 
@@ -250,6 +274,37 @@ python -m myusic_engine record-feedback `
   "spotify:track:0000000000000000000000" `
   accepted
 ```
+
+## Publish a private Spotify playlist
+
+First create a dry-run plan. This validates and hashes the exact name, description, order, and
+track URIs without reading an OAuth token or making a network request:
+
+```powershell
+python -m myusic_engine publish-spotify-playlist `
+  "data/processed/recommendations/spotify_playlist_uris.txt" `
+  --name "Myusic recommendations" `
+  --output-dir "data/processed/recommendations/spotify-output"
+```
+
+Review `spotify_playlist_plan.json`. To publish it, obtain a short-lived user OAuth token with
+`playlist-modify-private` and `playlist-read-private`, place it in the process environment as
+`SPOTIFY_ACCESS_TOKEN`, and rerun the same command with `--execute`. Never put a token in a command
+argument, config file, plan, receipt, or Git-tracked file.
+
+```powershell
+python -m myusic_engine publish-spotify-playlist `
+  "data/processed/recommendations/spotify_playlist_uris.txt" `
+  --name "Myusic recommendations" `
+  --output-dir "data/processed/recommendations/spotify-output" `
+  --execute
+```
+
+The publisher uses Spotify's current supported `/me/playlists` and `/playlists/{id}/items`
+operations, creates private playlists only, and writes a secret-free resumable receipt after each
+confirmed batch. A rerun reconciles the ordered remote prefix before appending; it refuses to
+continue if the playlist has drifted. See [Spotify playlist output](docs/spotify-playlist-output.md)
+for authorization, failure, and recovery details.
 
 ## Why this is a data-science project
 

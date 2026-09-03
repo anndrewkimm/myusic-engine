@@ -15,6 +15,9 @@ permitted catalog metadata
     -> identity matches + confidence
     -> source-tagged feature observations
 
+private account-export playlist
+    -> named, ordered, deduplicated candidate tracks + import provenance
+
 permitted audio
     -> objective descriptors + embeddings
     -> source-tagged feature observations
@@ -31,6 +34,7 @@ feature representations
 candidates + seeds + current behavior + selected model
     -> acoustic similarity + predicted preference + novelty + diversity
     -> explainable recommendations + Spotify URI handoff + explicit feedback
+    -> reviewed publication plan + explicitly authorized private Spotify playlist
 ```
 
 ## Design rules
@@ -46,6 +50,8 @@ candidates + seeds + current behavior + selected model
 8. Whole target periods belong to exactly one split; no future-period behavior becomes a feature.
 9. Unplayed candidates are unknown, not negative labels.
 10. JSON model artifacts are data, never executable pickle payloads.
+11. Spotify mutation is dry-run first, private-only, explicit, secret-free on disk, and resumable
+    only after reconciling the ordered remote prefix.
 
 ## Planned package ownership
 

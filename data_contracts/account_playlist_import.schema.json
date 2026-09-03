@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myusic-engine.local/schemas/account-playlist-import-v1.json",
+  "title": "Private account-data playlist import report",
+  "type": "object",
+  "required": [
+    "schema_version", "playlist_name", "last_modified_date", "source_file", "items_seen",
+    "tracks_written", "non_track_items_skipped", "duplicate_tracks_removed"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "playlist_name": { "type": "string", "minLength": 1 },
+    "last_modified_date": { "type": ["string", "null"] },
+    "source_file": { "type": "string", "minLength": 1 },
+    "items_seen": { "type": "integer", "minimum": 0 },
+    "tracks_written": { "type": "integer", "minimum": 1 },
+    "non_track_items_skipped": { "type": "integer", "minimum": 0 },
+    "duplicate_tracks_removed": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

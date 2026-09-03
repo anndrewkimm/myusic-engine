@@ -15,6 +15,7 @@ from myusic_engine.ranking.candidates import (
     CandidateTrack,
     read_candidates,
     spotify_uri,
+    write_candidates,
 )
 from myusic_engine.ranking.feedback import (
     FeedbackError,
@@ -80,4 +81,5 @@ __all__ = [
     "write_track_affinities",
     "weighted_query_embedding",
     "write_recommendations",
+    "write_candidates",
 ]
