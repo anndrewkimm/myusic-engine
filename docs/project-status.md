@@ -10,7 +10,7 @@ still requires an approved external service or permitted real audio.
 | 2 — identity resolution | Offline resolver plus cached public-provider and offline canonical-dump mappers implemented | Review-sample precision and resulting coverage for each mapper; the live route also needs the user's explicit per-run approval |
 | 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, pairwise sanity set, and retrieval-quality evaluation |
 | 4 — taste map and similarity | Standardized K-Means/HDBSCAN/PCA and retrieval implemented | Real lawful vectors and human retrieval sanity set |
-| 5 — personal preference ranker | Behavior baselines validated privately; audio ablations implemented | Lawful descriptor/embedding coverage and measured audio lift |
+| 5 — personal preference ranker | Behavior baselines validated privately; descriptor-audio lift measured on real offline-covered history (not yet significant); embedding ablations implemented but unrun | Lawful embedding coverage from real permitted audio, and broader/higher-fidelity descriptor coverage |
 | 6 — candidate intake/output | Local/account-export playlist intake, explainable ranking, URI handoff, feedback, and guarded private-playlist publication implemented | Real candidate features and an explicitly authorized live OAuth smoke test |
 
 Phase 1 validation read every discovered Extended History shard, rejected no malformed records,
@@ -76,6 +76,16 @@ private real-history sweep retained the 90-day period and default regularization
 artist baseline over an uncertain full-behavior lift, and left preference-only novelty disabled by
 default after a 101-point validation sweep. Detailed metrics and predictions remain ignored rather
 than being committed.
+
+A second private sweep repeated this comparison after the offline AcousticBrainz path populated
+real low-level descriptors for roughly half of the exactly matched history. On the resulting
+audio-covered cohort, the paired validation comparison did not find the behavior-plus-descriptor
+model reliably better than behavior alone — its confidence interval sat at or below zero — so
+selection kept the simpler behavior-only model on that cohort; the seven-field descriptor set used
+alone performed clearly worse than behavior. This is an honest result, not a defect: seven coarse
+interpretable fields are a thin representation next to the 1,280-dimensional embedding phase 3 is
+designed to add once real permitted audio is available, and the selection rule is built to prefer
+the simpler model exactly when a claimed lift is this uncertain.
 
 The engine deliberately does not emit Spotify-named `danceability`, `energy`, `valence`,
 `acousticness`, `speechiness`, or `instrumentalness` values. Learned outputs use custom

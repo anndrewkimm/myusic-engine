@@ -36,8 +36,9 @@ Phase 1 has now been validated against both Spotify export formats. Private EDA 
 coverage, URI-backed track affinities, the expected Extended History playback signals, and a clean
 ingestion report. Phase 2 now has an offline account-catalog resolver and an offline canonical-dump
 MusicBrainz mapper; live-provider coverage and manual match validation remain. A private
-behavior-only chronological model run is complete.
-Audio ablations and the real taste map remain gated on lawful feature/embedding coverage. Phase 3
+behavior-only chronological model run is complete, and a private descriptor-audio ablation has now
+run on real offline-covered history — behavior alone remains the selected model there too.
+Embedding ablations and the real taste map remain gated on lawful embedding coverage. Phase 3
 has a tested foundation, but its exit criterion still requires quality evaluation on a permitted
 real music corpus. See
 [current project status](docs/project-status.md).
