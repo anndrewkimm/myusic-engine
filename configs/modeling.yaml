@@ -48,6 +48,40 @@ profiles:
         dimensions: 12
     embedding_input: null
 
+  acousticbrainz_lowlevel_offline:
+    profile_version: acousticbrainz_lowlevel_offline_profile_v1
+    minimum_confidence: 0.50
+    descriptor_inputs:
+      - feature_name: average_loudness_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: dynamic_complexity_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: tempo_bpm_estimate_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: danceability_estimate_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: onset_rate_hz_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: tuning_deviation_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+      - feature_name: tuning_frequency_hz_v1
+        feature_source: acousticbrainz_cc0
+        source_version: frozen-2022-lowlevel-converter-v1
+        dimensions: 1
+    embedding_input: null
+
   local_discogs_effnet:
     profile_version: local_discogs_effnet_profile_v1
     minimum_confidence: 0.50

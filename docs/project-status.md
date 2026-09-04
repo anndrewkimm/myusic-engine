@@ -61,7 +61,11 @@ than the live API by design: only the fields present in the derived CSVs are pop
 combined descriptor vector feature is never emitted, and high-level mood/genre predictions are
 never available offline, since AcousticBrainz never published a bulk dump of those. Both source
 routes tag output with the same `acousticbrainz_cc0` / `frozen-2022-lowlevel-converter-v1`
-provenance, because both ultimately read the identical frozen snapshot.
+provenance, because both ultimately read the identical frozen snapshot. The existing
+`acousticbrainz_lowlevel` modeling profile requires the combined descriptor vector and so only
+ever matches live-sourced coverage; a new `acousticbrainz_lowlevel_offline` profile lists the
+seven individual fields both routes can populate, so offline-only coverage can still train and
+evaluate a taste model instead of sitting unused.
 
 The phase-5 implementation creates non-overlapping target periods, freezes behavior before each
 period, abstains on ambiguous outcomes, and reserves whole later periods for validation and test.

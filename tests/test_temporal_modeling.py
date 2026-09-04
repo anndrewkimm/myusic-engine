@@ -91,3 +91,13 @@ def test_modeling_config_locks_audio_provenance() -> None:
     assert profile.embedding_input is not None
     assert profile.embedding_input.dimensions == 1280
     assert sum(item.dimensions for item in profile.descriptor_inputs) == 61
+
+
+def test_modeling_config_offline_acousticbrainz_profile_matches_bulk_dump_coverage() -> None:
+    config = load_modeling_config("configs/modeling.yaml")
+    profile = config.profiles["acousticbrainz_lowlevel_offline"]
+    assert profile.embedding_input is None
+    assert sum(item.dimensions for item in profile.descriptor_inputs) == 7
+    assert all(
+        item.selector.feature_source == "acousticbrainz_cc0" for item in profile.descriptor_inputs
+    )
