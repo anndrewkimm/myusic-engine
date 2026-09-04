@@ -25,8 +25,8 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 - six versioned learned scores for danceable, acoustic, instrumental, happy, aggressive, and
   relaxed audio characteristics;
 - exact cosine retrieval with weighted multi-seed queries and provenance-aware filters;
-- cached, precision-first MusicBrainz mapping (live or from an offline canonical dump) and frozen
-  CC0 AcousticBrainz feature conversion;
+- cached, precision-first MusicBrainz mapping and frozen CC0 AcousticBrainz feature conversion,
+  each with a live and a fully offline dump-scanning route;
 - leakage-safe 90-day taste labels with whole-period train/validation/test splits;
 - behavior, descriptor, embedding, and combined logistic ablations on matched audio cohorts;
 - standardized K-Means/HDBSCAN taste maps with stability evidence and PCA coordinates;
@@ -167,6 +167,28 @@ Download the dated `.tar.zst` release and its `.sha256` checksum from
 published twice monthly; a plain `.csv` or `.tar` is also accepted. This path applies the same
 strict exact-match policy as the live mapper and ignores `--cache-dir`/`--offline` since nothing is
 cached or fetched over the network.
+
+`fetch-acousticbrainz` has the same kind of offline alternative. AcousticBrainz's own low-level
+dataset was frozen in 2022 and published as three derived CSV dumps (lowlevel, rhythm, tonal); a
+local scan of any subset of them never sends a recording MBID over the network:
+
+```powershell
+python -m myusic_engine fetch-acousticbrainz `
+  "data/interim/musicbrainz/history-local-canonical/external_identity_matches.jsonl" `
+  --output-dir "data/processed/audio/acousticbrainz" `
+  --lowlevel-dump "data/raw/acousticbrainz-lowlevel-features-20220623-lowlevel.tar.zst" `
+  --rhythm-dump "data/raw/acousticbrainz-lowlevel-features-20220623-rhythm.tar.zst" `
+  --tonal-dump "data/raw/acousticbrainz-lowlevel-features-20220623-tonal.tar.zst"
+```
+
+Download the three dated dumps from
+[AcousticBrainz's dataset dumps](https://data.metabrainz.org/pub/musicbrainz/acousticbrainz/dumps/).
+Only the fields present in these CSVs are populated (loudness, dynamic complexity, tempo,
+danceability, onset rate, key/mode, and tuning), so the combined low-level descriptor vector is
+never emitted from this path, and it never fills in high-level mood/genre predictions, which are
+not part of this dataset — both stay honestly absent rather than guessed. It applies the same
+"lowest submission offset wins" tie-break as the live client. Any of the three dumps can be
+omitted; coverage narrows accordingly instead of failing.
 
 ## Analyze permitted audio
 

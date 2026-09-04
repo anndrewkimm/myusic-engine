@@ -153,7 +153,8 @@ def _parser() -> argparse.ArgumentParser:
 
     acousticbrainz_parser = subparsers.add_parser(
         "fetch-acousticbrainz",
-        help="Fetch frozen CC0 audio descriptors for exact MusicBrainz matches.",
+        help="Fetch frozen CC0 audio descriptors for exact MusicBrainz matches, remotely or "
+        "from local dumps.",
     )
     acousticbrainz_parser.add_argument(
         "external_matches",
@@ -182,6 +183,21 @@ def _parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="Use cached responses only and fail on a cache miss",
+    )
+    acousticbrainz_parser.add_argument(
+        "--lowlevel-dump",
+        type=Path,
+        help="Frozen 2022 AcousticBrainz lowlevel CSV or tar.zst; keeps MBIDs local",
+    )
+    acousticbrainz_parser.add_argument(
+        "--rhythm-dump",
+        type=Path,
+        help="Frozen 2022 AcousticBrainz rhythm CSV or tar.zst; keeps MBIDs local",
+    )
+    acousticbrainz_parser.add_argument(
+        "--tonal-dump",
+        type=Path,
+        help="Frozen 2022 AcousticBrainz tonal CSV or tar.zst; keeps MBIDs local",
     )
 
     temporal_parser = subparsers.add_parser(
@@ -671,19 +687,50 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         from myusic_engine.matching import read_external_identity_matches
         from myusic_engine.providers import (
+            AcousticBrainzBulkError,
             AcousticBrainzClient,
+            AcousticBrainzProvider,
             JsonCacheTransport,
             ProviderError,
+            build_offline_acousticbrainz_provider,
         )
 
         try:
-            transport = JsonCacheTransport(
-                args.cache_dir,
-                minimum_interval_seconds=1.0,
-                offline=args.offline,
-            )
-            provider = AcousticBrainzClient(transport)
             external_matches = read_external_identity_matches(args.external_matches)
+            bulk_dumps = (args.lowlevel_dump, args.rhythm_dump, args.tonal_dump)
+            provider: AcousticBrainzProvider
+            if any(dump is not None for dump in bulk_dumps):
+                target_mbids = {
+                    match.recording_mbid
+                    for match in external_matches
+                    if match.match_status == "exact" and match.recording_mbid is not None
+                }
+
+                def acoustic_scan_progress(section: str, rows_scanned: int) -> None:
+                    print(
+                        f"Scanned {rows_scanned:,} {section} rows locally...",
+                        flush=True,
+                    )
+
+                provider, acoustic_scan_report = build_offline_acousticbrainz_provider(
+                    target_mbids,
+                    lowlevel_dump=args.lowlevel_dump,
+                    rhythm_dump=args.rhythm_dump,
+                    tonal_dump=args.tonal_dump,
+                    progress=acoustic_scan_progress,
+                )
+                print(
+                    f"Local scan of {', '.join(acoustic_scan_report.sections_scanned)} covered "
+                    f"{acoustic_scan_report.mbids_covered}/{acoustic_scan_report.target_mbids} "
+                    "recording MBIDs."
+                )
+            else:
+                transport = JsonCacheTransport(
+                    args.cache_dir,
+                    minimum_interval_seconds=1.0,
+                    offline=args.offline,
+                )
+                provider = AcousticBrainzClient(transport)
 
             def feature_progress(processed: int, total: int) -> None:
                 if processed == total or processed % 10 == 0:
@@ -696,7 +743,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 progress=feature_progress,
             )
             write_acousticbrainz_result(acoustic_result, args.output_dir)
-        except (FeatureRecordError, IdentityResolutionError, ProviderError, OSError) as exc:
+        except (
+            AcousticBrainzBulkError,
+            FeatureRecordError,
+            IdentityResolutionError,
+            ProviderError,
+            OSError,
+        ) as exc:
             print(f"AcousticBrainz feature fetch failed: {exc}", file=sys.stderr)
             return 2
         acoustic_report = acoustic_result.report

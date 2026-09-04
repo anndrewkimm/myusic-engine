@@ -54,6 +54,15 @@ The phase-3 foundation currently provides:
 AcousticBrainz descriptors are not presented as deep embeddings. A true Discogs-EffNet track
 embedding still requires a waveform the user owns or otherwise has permission to analyze.
 
+`fetch-acousticbrainz` can also convert AcousticBrainz's own frozen 2022 low-level dataset
+directly from its three local CSV/tar.zst dumps (lowlevel, rhythm, tonal) instead of the live API,
+so no recording MBID needs to be disclosed over the network. Coverage from this path is narrower
+than the live API by design: only the fields present in the derived CSVs are populated, so the
+combined descriptor vector feature is never emitted, and high-level mood/genre predictions are
+never available offline, since AcousticBrainz never published a bulk dump of those. Both source
+routes tag output with the same `acousticbrainz_cc0` / `frozen-2022-lowlevel-converter-v1`
+provenance, because both ultimately read the identical frozen snapshot.
+
 The phase-5 implementation creates non-overlapping target periods, freezes behavior before each
 period, abstains on ambiguous outcomes, and reserves whole later periods for validation and test.
 It compares repeat/recency, artist, full behavior, descriptor, embedding, and combined variants;

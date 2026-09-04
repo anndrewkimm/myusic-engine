@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-import codecs
 import csv
-import importlib
 import re
-import sys
-import tarfile
 import unicodedata
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import IO
+from pathlib import Path
 
+from myusic_engine.bulk_dump import open_dump_csv_lines
 from myusic_engine.matching.models import IdentityInputError, TrackQuery
 from myusic_engine.matching.resolver import normalize_metadata
 from myusic_engine.providers import ListenBrainzMapping, ProviderError
@@ -113,98 +108,6 @@ def _selected_queries(
     return ordered[:maximum_tracks]
 
 
-@contextmanager
-def _zstd_tar(source: Path) -> Iterator[tarfile.TarFile]:
-    if sys.version_info >= (3, 14):
-        try:
-            with tarfile.open(source, mode="r|zst") as archive:
-                yield archive
-        except (OSError, tarfile.TarError) as exc:
-            raise CanonicalDumpError("Canonical MusicBrainz tar.zst is unreadable") from exc
-        return
-
-    try:
-        zstandard = importlib.import_module("zstandard")
-    except ModuleNotFoundError as exc:
-        raise CanonicalDumpError(
-            "Reading tar.zst on Python 3.11-3.13 requires the zstandard package"
-        ) from exc
-    try:
-        with source.open("rb") as raw_stream:
-            reader = zstandard.ZstdDecompressor().stream_reader(raw_stream)
-            try:
-                with tarfile.open(fileobj=reader, mode="r|") as archive:
-                    yield archive
-            finally:
-                reader.close()
-    except (OSError, tarfile.TarError) as exc:
-        raise CanonicalDumpError("Canonical MusicBrainz tar.zst is unreadable") from exc
-
-
-@contextmanager
-def _archive_csv(archive: tarfile.TarFile) -> Iterator[Iterable[str]]:
-    for member in archive:
-        if member.isfile() and PurePosixPath(member.name).name == _CANONICAL_MEMBER_NAME:
-            binary_stream = archive.extractfile(member)
-            if binary_stream is None:
-                break
-            # Streaming tar members are intentionally not seekable. Decode chunks ourselves
-            # so U+2028/U+2029 inside CSV fields are not mistaken for physical line endings.
-            stream = _utf8_physical_lines(binary_stream)
-            try:
-                yield stream
-            except UnicodeError as exc:
-                raise CanonicalDumpError(
-                    "Canonical MusicBrainz CSV contains invalid UTF-8"
-                ) from exc
-            finally:
-                binary_stream.close()
-            return
-    raise CanonicalDumpError(
-        f"Canonical MusicBrainz dump does not contain {_CANONICAL_MEMBER_NAME}"
-    )
-
-
-def _utf8_physical_lines(stream: IO[bytes], *, chunk_size: int = 1 << 16) -> Iterator[str]:
-    decoder = codecs.getincrementaldecoder("utf-8")("strict")
-    pending = ""
-    while block := stream.read(chunk_size):
-        lines = (pending + decoder.decode(block)).split("\n")
-        pending = lines.pop()
-        for line in lines:
-            yield line + "\n"
-    pending += decoder.decode(b"", final=True)
-    if pending:
-        yield pending
-
-
-@contextmanager
-def _canonical_csv(source: Path) -> Iterator[Iterable[str]]:
-    if not source.is_file():
-        raise CanonicalDumpError("Canonical MusicBrainz input does not exist or is not a file")
-    if source.suffix.casefold() == ".csv":
-        try:
-            with source.open("r", encoding="utf-8", newline="") as stream:
-                yield stream
-        except (OSError, UnicodeError) as exc:
-            raise CanonicalDumpError("Canonical MusicBrainz CSV is unreadable") from exc
-        return
-    if source.suffix.casefold() == ".tar":
-        try:
-            with tarfile.open(source, mode="r|") as archive, _archive_csv(archive) as stream:
-                yield stream
-        except CanonicalDumpError:
-            raise
-        except (OSError, tarfile.TarError) as exc:
-            raise CanonicalDumpError("Canonical MusicBrainz tar is unreadable") from exc
-        return
-    if not source.name.casefold().endswith(".tar.zst"):
-        raise CanonicalDumpError("Canonical MusicBrainz input must be a CSV, tar, or tar.zst dump")
-
-    with _zstd_tar(source) as archive, _archive_csv(archive) as stream:
-        yield stream
-
-
 def _provider_name(source: Path) -> str:
     timestamp = _DUMP_TIMESTAMP.search(source.name)
     if timestamp is None:
@@ -250,7 +153,9 @@ def build_canonical_dump_mapper(
     try:
         previous_limit = csv.field_size_limit()
         csv.field_size_limit(max(previous_limit, 10_000_000))
-        with _canonical_csv(source_path) as stream:
+        with open_dump_csv_lines(
+            source_path, member_name=_CANONICAL_MEMBER_NAME, error_cls=CanonicalDumpError
+        ) as stream:
             reader = csv.reader(stream)
             try:
                 header = tuple(next(reader))
