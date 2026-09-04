@@ -49,6 +49,8 @@ as resolved IDs. The policy version is retained on every record and in the aggre
 
 This local catalog can only identify tracks that appear in the account's library or playlists.
 Unmatched tracks require a permitted external metadata provider or the eventual Extended Streaming
-History URI. A future provider adapter must preserve the same exact/fuzzy/ambiguous boundary,
-record provider provenance, and be evaluated against a manually reviewed stratified sample before
-its matches are used as training labels.
+History URI. Two provider adapters exist today: the live ListenBrainz Labs mapper and an offline
+mapper that scans an official MusicBrainz canonical data dump (see
+[the README](../README.md#obtain-lawful-historical-descriptors)). Both preserve the same
+exact/fuzzy/ambiguous boundary and record provider provenance; their matches still require
+evaluation against a manually reviewed stratified sample before use as training labels.

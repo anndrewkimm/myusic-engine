@@ -7,7 +7,7 @@ still requires an approved external service or permitted real audio.
 |---|---|---|
 | 0 — data-independent foundation | Complete | None for the synthetic foundation |
 | 1 — personal history foundation | Complete — Extended History validated locally | Rerun only when a newer export is imported |
-| 2 — identity resolution | Offline resolver plus cached public-provider implementation | User-approved provider run, review-sample precision, and resulting coverage |
+| 2 — identity resolution | Offline resolver plus cached public-provider and offline canonical-dump mappers implemented | Review-sample precision and resulting coverage for each mapper; the live route also needs the user's explicit per-run approval |
 | 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, pairwise sanity set, and retrieval-quality evaluation |
 | 4 — taste map and similarity | Standardized K-Means/HDBSCAN/PCA and retrieval implemented | Real lawful vectors and human retrieval sanity set |
 | 5 — personal preference ranker | Behavior baselines validated privately; audio ablations implemented | Lawful descriptor/embedding coverage and measured audio lift |
@@ -24,6 +24,13 @@ AcousticBrainz low/high-level fetch passed live; only strict exact metadata matc
 MusicBrainz recording IDs. Provider responses are cached, bounded, retry-safe, and replayable
 offline. The private-data run remains paused until the user explicitly approves sending that
 limited title/artist/album metadata.
+
+Phase 2 also has an offline mapper that scans an official MusicBrainz canonical data dump instead
+of calling a live endpoint, so no title/artist/album metadata leaves the machine. It applies the
+same strict-exact-match policy, prefers the documented higher-score row when the dump lists more
+than one candidate row for a recording, and reports its own provider name and coverage separately
+from the live mapper. This route does not need the live mapper's per-run disclosure approval, but
+its matches still need the same manually reviewed stratified sample before use as training labels.
 
 Phase 2 and phase 3 meet at `track_id`, but phase 3 can proceed independently. For a recording that
 already has a Spotify track URI, the private audio manifest can use that URI directly. For another

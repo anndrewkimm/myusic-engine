@@ -265,6 +265,7 @@ def _match_query(
     query: TrackQuery,
     mapping: ListenBrainzMapping | None,
     policy: ExternalIdentityPolicy,
+    provider_name: str,
 ) -> ExternalIdentityMatch:
     if mapping is None:
         return ExternalIdentityMatch(
@@ -276,7 +277,7 @@ def _match_query(
             album_name=query.album_name,
             play_count=query.play_count,
             total_ms_played=query.total_ms_played,
-            provider="listenbrainz_labs_musicbrainz_mapper",
+            provider=provider_name,
             match_status="unmatched",
             match_method="provider_unmatched",
             recording_mbid=None,
@@ -323,7 +324,7 @@ def _match_query(
         album_name=query.album_name,
         play_count=query.play_count,
         total_ms_played=query.total_ms_played,
-        provider="listenbrainz_labs_musicbrainz_mapper",
+        provider=provider_name,
         match_status=status,
         match_method=method,
         recording_mbid=accepted_mbid,
@@ -345,10 +346,14 @@ def resolve_external_identities(
     policy: ExternalIdentityPolicy | None = None,
     maximum_tracks: int | None = None,
     progress: Callable[[int, int], None] | None = None,
+    provider_name: str = "listenbrainz_labs_musicbrainz_mapper",
 ) -> ExternalIdentityResult:
     """Map highest-value history tracks and accept only exact metadata evidence."""
 
     active_policy = policy or ExternalIdentityPolicy()
+    if not isinstance(provider_name, str) or not provider_name.strip():
+        raise IdentityInputError("provider_name must be non-empty text")
+    provider_name = provider_name.strip()
     ordered_queries = sorted(
         queries,
         key=lambda item: (-item.play_count, -item.total_ms_played, item.source_track_id),
@@ -372,7 +377,7 @@ def resolve_external_identities(
             if query.artist_name and query.track_name
             else None
         )
-        match = _match_query(query, mapping, active_policy)
+        match = _match_query(query, mapping, active_policy, provider_name)
         assert_privacy_safe(match.to_dict())
         matches.append(match)
         if progress is not None:
@@ -393,7 +398,7 @@ def resolve_external_identities(
     processed = len(matches)
     report = ExternalIdentityReport(
         policy_version=active_policy.policy_version,
-        provider="listenbrainz_labs_musicbrainz_mapper",
+        provider=provider_name,
         queries_available=len(ordered_queries),
         queries_processed=processed,
         exact_count=len(exact_matches),

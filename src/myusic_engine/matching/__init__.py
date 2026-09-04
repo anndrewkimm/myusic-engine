@@ -5,6 +5,12 @@ from myusic_engine.matching.account_catalog import (
     load_account_playlist,
     write_account_playlist_report,
 )
+from myusic_engine.matching.canonical_dump import (
+    CanonicalDumpError,
+    CanonicalDumpMapper,
+    CanonicalDumpScanReport,
+    build_canonical_dump_mapper,
+)
 from myusic_engine.matching.external import (
     ExternalIdentityMatch,
     ExternalIdentityPolicy,
@@ -41,6 +47,9 @@ __all__ = [
     "AccountPlaylist",
     "CatalogLoadResult",
     "CatalogTrack",
+    "CanonicalDumpError",
+    "CanonicalDumpMapper",
+    "CanonicalDumpScanReport",
     "ExternalIdentityMatch",
     "ExternalIdentityPolicy",
     "ExternalIdentityReport",
@@ -53,6 +62,7 @@ __all__ = [
     "IdentityResolutionResult",
     "MatchCandidate",
     "TrackQuery",
+    "build_canonical_dump_mapper",
     "load_account_catalog",
     "load_account_playlist",
     "load_identity_policy",

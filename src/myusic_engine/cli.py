@@ -110,7 +110,7 @@ def _parser() -> argparse.ArgumentParser:
 
     external_parser = subparsers.add_parser(
         "map-musicbrainz",
-        help="Map history or candidate metadata to MusicBrainz through a cached public mapper.",
+        help="Map history or candidate metadata to MusicBrainz remotely or from a local dump.",
     )
     external_parser.add_argument(
         "input_file",
@@ -144,6 +144,11 @@ def _parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="Use cached responses only and fail on a cache miss",
+    )
+    external_parser.add_argument(
+        "--canonical-dump",
+        type=Path,
+        help="Official canonical MusicBrainz CSV or tar.zst; keeps query metadata local",
     )
 
     acousticbrainz_parser = subparsers.add_parser(
@@ -545,26 +550,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "map-musicbrainz":
         from myusic_engine.matching import (
+            CanonicalDumpError,
             ExternalIdentityPolicy,
             TrackQuery,
+            build_canonical_dump_mapper,
             resolve_external_identities,
             write_external_identity_resolution,
         )
         from myusic_engine.providers import (
             JsonCacheTransport,
             ListenBrainzMappingClient,
+            MusicBrainzMapper,
             ProviderError,
         )
         from myusic_engine.ranking import CandidateInputError, read_candidates
 
         try:
-            external_policy = ExternalIdentityPolicy()
-            transport = JsonCacheTransport(
-                args.cache_dir,
-                minimum_interval_seconds=0.1,
-                offline=args.offline,
-            )
-            mapper = ListenBrainzMappingClient(transport)
             if args.input_kind == "candidates":
                 candidates = read_candidates(args.input_file)
                 queries = tuple(
@@ -585,6 +586,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                 queries = read_track_queries(args.input_file)
                 progress_label = "history tracks"
 
+            mapper: MusicBrainzMapper
+            if args.canonical_dump is not None:
+                external_policy = ExternalIdentityPolicy(
+                    policy_version="musicbrainz_canonical_dump_exact_metadata_v1"
+                )
+
+                def scan_progress(rows_scanned: int) -> None:
+                    print(
+                        f"Scanned {rows_scanned:,} canonical MusicBrainz rows locally...",
+                        flush=True,
+                    )
+
+                mapper, scan_report = build_canonical_dump_mapper(
+                    queries,
+                    args.canonical_dump,
+                    maximum_tracks=args.limit,
+                    progress=scan_progress,
+                )
+                provider_name = scan_report.provider_name
+                print(
+                    f"Local canonical scan retained {scan_report.exact_query_keys} unique exact "
+                    f"metadata keys and rejected {scan_report.ambiguous_query_keys} ambiguous "
+                    "keys."
+                )
+            else:
+                external_policy = ExternalIdentityPolicy()
+                transport = JsonCacheTransport(
+                    args.cache_dir,
+                    minimum_interval_seconds=0.1,
+                    offline=args.offline,
+                )
+                mapper = ListenBrainzMappingClient(transport)
+                provider_name = "listenbrainz_labs_musicbrainz_mapper"
+
             def mapping_progress(processed: int, total: int) -> None:
                 if processed == total or processed % 25 == 0:
                     print(f"Mapped {processed}/{total} {progress_label}...", flush=True)
@@ -595,13 +630,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 policy=external_policy,
                 maximum_tracks=args.limit,
                 progress=mapping_progress,
+                provider_name=provider_name,
             )
             write_external_identity_resolution(
                 external_result,
                 args.output_dir,
                 review_sample_per_status=external_policy.review_sample_per_status,
             )
-        except (CandidateInputError, IdentityResolutionError, ProviderError, OSError) as exc:
+        except (
+            CandidateInputError,
+            CanonicalDumpError,
+            IdentityResolutionError,
+            ProviderError,
+            OSError,
+        ) as exc:
             print(f"MusicBrainz mapping failed: {exc}", file=sys.stderr)
             return 2
         counts = external_result.report.status_counts

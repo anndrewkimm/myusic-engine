@@ -25,7 +25,8 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 - six versioned learned scores for danceable, acoustic, instrumental, happy, aggressive, and
   relaxed audio characteristics;
 - exact cosine retrieval with weighted multi-seed queries and provenance-aware filters;
-- cached, precision-first MusicBrainz mapping and frozen CC0 AcousticBrainz feature conversion;
+- cached, precision-first MusicBrainz mapping (live or from an offline canonical dump) and frozen
+  CC0 AcousticBrainz feature conversion;
 - leakage-safe 90-day taste labels with whole-period train/validation/test splits;
 - behavior, descriptor, embedding, and combined logistic ablations on matched audio cohorts;
 - standardized K-Means/HDBSCAN taste maps with stability evidence and PCA coordinates;
@@ -33,8 +34,9 @@ The data-independent foundation from the [project brief](docs/project-brief.md) 
 
 Phase 1 has now been validated against both Spotify export formats. Private EDA confirmed lifetime
 coverage, URI-backed track affinities, the expected Extended History playback signals, and a clean
-ingestion report. Phase 2 now has an offline account-catalog resolver; external provider coverage
-and manual match validation remain. A private behavior-only chronological model run is complete.
+ingestion report. Phase 2 now has an offline account-catalog resolver and an offline canonical-dump
+MusicBrainz mapper; live-provider coverage and manual match validation remain. A private
+behavior-only chronological model run is complete.
 Audio ablations and the real taste map remain gated on lawful feature/embedding coverage. Phase 3
 has a tested foundation, but its exit criterion still requires quality evaluation on a permitted
 real music corpus. See
@@ -147,6 +149,24 @@ python -m myusic_engine map-musicbrainz `
 Only strict exact mapper results receive MBIDs. Fuzzy and unmatched results remain review-only.
 The mapper cache is resumable and `--offline` forbids network requests. AcousticBrainz supplies
 lawful historical descriptors and learned scores, but it does not replace a deep track embedding.
+
+Mapping can also run entirely offline against an official canonical MusicBrainz dump instead of
+calling the live ListenBrainz Labs API. The whole dump is scanned locally and no title/artist/album
+metadata ever leaves the machine, so this path does not require the same explicit per-run
+disclosure decision as the live mapper:
+
+```powershell
+python -m myusic_engine map-musicbrainz `
+  "data/processed/history/user_track_affinity.jsonl" `
+  --output-dir "data/interim/musicbrainz" `
+  --canonical-dump "data/raw/musicbrainz-canonical-dump-20260903-080002.tar.zst"
+```
+
+Download the dated `.tar.zst` release and its `.sha256` checksum from
+[MusicBrainz's canonical data dumps](https://data.metabrainz.org/pub/musicbrainz/canonical_data/),
+published twice monthly; a plain `.csv` or `.tar` is also accepted. This path applies the same
+strict exact-match policy as the live mapper and ignores `--cache-dir`/`--offline` since nothing is
+cached or fetched over the network.
 
 ## Analyze permitted audio
 
