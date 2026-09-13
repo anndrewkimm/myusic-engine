@@ -21,6 +21,13 @@ dependencies = [
 myusic-engine = "myusic_engine.cli:main"
 
 [project.optional-dependencies]
+clap = [
+  "torch>=2.6,<3",
+  "transformers>=5.8,<5.9",
+  "librosa>=0.11,<0.12",
+  "soundfile>=0.13,<0.14",
+  "pyloudnorm>=0.1.1,<0.2",
+]
 phase3 = [
   "librosa>=0.11,<0.12",
   "numpy>=2.0,<3",
@@ -47,7 +54,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-myusic_engine = ["py.typed"]
+myusic_engine = ["py.typed", "assets/*.html"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
@@ -75,5 +82,5 @@ strict = true
 files = ["src/myusic_engine"]
 
 [[tool.mypy.overrides]]
-module = ["onnxruntime", "pyloudnorm", "scipy.*", "sklearn.*", "soundfile"]
+module = ["onnxruntime", "pyloudnorm", "scipy.*", "sklearn.*", "soundfile", "torch", "transformers"]
 ignore_missing_imports = true

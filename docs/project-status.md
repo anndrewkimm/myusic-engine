@@ -3,6 +3,20 @@
 This status separates implemented code, private validation already completed, and evidence that
 still requires an approved external service or permitted real audio.
 
+September 11 update: local Hugging Face CLAP inference, weighted audio/text queries, candidate
+feature/artist filters, per-track extraction checkpoints, and an interactive standalone HTML
+explorer are implemented. A repeatable Creative Commons demonstration now exercises the path
+from real audio through clustering and ranking. The initial three-recording gain/excerpt identity
+benchmark passed for both CLAP and Discogs-EffNet; this is a small robustness check, not a personal
+preference improvement. The existing private recommendation run also has a browser explorer.
+Details and reproduction commands are in
+[Hugging Face audio and the local explorer](huggingface-audio-and-explorer.md).
+
+Verification for this update: 194 tests pass with 79.11% branch-aware coverage; Ruff, formatting,
+strict mypy, and wheel packaging pass. Hidden Edge checks exercised both the private existing run
+and the four-recording demo on desktop/mobile, including search and clickable map points, with no
+page console errors or remote requests. The wheel contains the browser template and no private data.
+
 | Phase | Status | Evidence still needed |
 |---|---|---|
 | 0 — data-independent foundation | Complete | None for the synthetic foundation |

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "excluded_artists": [],
+  "filters": [
+    {
+      "feature_name": "tempo_bpm_estimate_v1",
+      "feature_source": "clean_room_audio",
+      "source_version": "objective-dsp-0.3.0",
+      "minimum": 80,
+      "maximum": 150,
+      "required": true,
+      "minimum_confidence": 0.5
+    },
+    {
+      "feature_name": "bass_energy_ratio_150hz_v1",
+      "feature_source": "clean_room_audio",
+      "source_version": "objective-dsp-0.3.0",
+      "minimum": 0.1,
+      "required": true,
+      "minimum_confidence": 0.5
+    }
+  ]
+}

@@ -13,6 +13,39 @@ been validated locally. No copyrighted Spotify audio is required to build or tes
 
 ## Current milestone
 
+September 2026 additions: a verified local Hugging Face CLAP backend, natural-language sound
+queries blended with weighted song seeds, hard feature/artist filters in candidate ranking,
+resumable per-track extraction, a real-audio invariance benchmark, and a standalone browser
+explorer. The explorer supports track search, evidence filters, Spotify URI downloads, and
+clickable taste-map points without a server or external requests.
+
+Try the complete demonstration using four attributed Creative Commons music excerpts:
+
+```powershell
+python -m pip install -e ".[clap]"
+python scripts/run_demo.py --download
+# Open data/processed/demo/explorer.html in your browser.
+
+# Subsequent runs are offline and reuse completed extraction checkpoints.
+python scripts/run_demo.py
+```
+
+The first run downloads approximately 615 MB of model weights plus small public audio files.
+The demonstration includes a noncommercial Creative Commons sample; retained attribution and
+license files are in `data/private/open-demo/`. These examples validate the workflow and are
+not your personal taste model. Your Spotify history still needs matching permitted audio to
+evaluate an improvement from deep embeddings.
+
+For your existing recommendation run, create a private browser report:
+
+```powershell
+python -m myusic_engine build-report data/processed/recommendations/fairy `
+  --output data/processed/recommendations/fairy/explorer.html
+```
+
+See [Hugging Face audio and the local explorer](docs/huggingface-audio-and-explorer.md)
+for extraction, description queries, filters, checkpoint behavior, and measured validation.
+
 The data-independent foundation from the [project brief](docs/project-brief.md) is now usable:
 
 - privacy-safe Spotify history ingestion from JSON, directories, or ZIP archives;

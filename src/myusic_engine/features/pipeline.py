@@ -7,10 +7,11 @@ import io
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 
-from myusic_engine.audio import AudioAsset, decode_audio
+from myusic_engine.audio import AudioAsset, DecodedAudio, decode_audio
 from myusic_engine.embeddings import DiscogsEffnetOnnxBackend, EmbeddingAnalysis
 from myusic_engine.features.config import ObjectiveFeatureConfig
 from myusic_engine.features.learned import (
@@ -21,6 +22,10 @@ from myusic_engine.features.learned import (
 from myusic_engine.features.objective import ObjectiveFeatureExtractor
 from myusic_engine.features.records import FeatureObservation
 from myusic_engine.io import atomic_write_bytes
+
+
+class AudioEmbeddingBackend(Protocol):
+    def extract(self, track_id: str, audio: DecodedAudio) -> EmbeddingAnalysis: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,7 +77,7 @@ def analyze_audio_assets(
     assets: Iterable[AudioAsset],
     *,
     config: ObjectiveFeatureConfig | None = None,
-    embedding_backend: DiscogsEffnetOnnxBackend | None = None,
+    embedding_backend: AudioEmbeddingBackend | None = None,
     feature_head_backend: DiscogsEffnetFeatureHeadBackend | None = None,
     window_output_dir: str | Path | None = None,
 ) -> AudioFeaturePipelineResult:
@@ -84,7 +89,9 @@ def analyze_audio_assets(
     embedding_windows = 0
     learned_scores = 0
     private_window_dir = Path(window_output_dir) if window_output_dir is not None else None
-    if feature_head_backend is not None and embedding_backend is None:
+    if feature_head_backend is not None and not isinstance(
+        embedding_backend, DiscogsEffnetOnnxBackend
+    ):
         raise LearnedFeatureError("Learned feature heads require the Discogs-EffNet backend")
     for asset in ordered_assets:
         audio = decode_audio(

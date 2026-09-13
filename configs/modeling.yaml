@@ -38,6 +38,16 @@ model:
   ranking_k: 20
 
 profiles:
+  local_clap:
+    profile_version: clap_profile_v1
+    minimum_confidence: 0.50
+    descriptor_inputs: []
+    embedding_input:
+      feature_name: clap_audio_embedding_v1
+      feature_source: huggingface_clap
+      source_version: clap-htsat-unfused@8fa0f1c6d0433df6e97c127f64b2a1d6c0dcda8a+10s-tail-v1+mean-l2-v1
+      dimensions: 512
+
   acousticbrainz_lowlevel:
     profile_version: acousticbrainz_lowlevel_profile_v1
     minimum_confidence: 0.50

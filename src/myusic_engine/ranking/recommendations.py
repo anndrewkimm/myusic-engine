@@ -14,7 +14,7 @@ from typing import Literal, TypeAlias, cast
 import yaml
 
 from myusic_engine.clustering import TasteMapAssignment
-from myusic_engine.features import FeatureObservation
+from myusic_engine.features import FeatureCatalog, FeatureObservation
 from myusic_engine.io import atomic_write_text
 from myusic_engine.modeling import (
     BEHAVIOR_FEATURE_NAMES,
@@ -27,6 +27,8 @@ from myusic_engine.modeling import (
 )
 from myusic_engine.privacy import assert_privacy_safe
 from myusic_engine.ranking.candidates import CandidateTrack
+from myusic_engine.ranking.constraints import RankingConstraints
+from myusic_engine.ranking.query import SoundQuery
 from myusic_engine.ranking.similarity import weighted_query_embedding
 
 RankingTier: TypeAlias = Literal["audio_ranked", "preference_ranked", "metadata_only"]
@@ -212,6 +214,9 @@ class RecommendationReport:
     behavior_snapshot_as_of: str | None
     config: RecommendationConfig
     schema_version: int = 1
+    sound_query: SoundQuery | None = None
+    requested_top_k: int = 50
+    constraints: RankingConstraints | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -222,6 +227,9 @@ class RecommendationReport:
             "output_count": self.output_count,
             "tier_counts": dict(sorted(self.tier_counts.items())),
             "seed_count": self.seed_count,
+            "sound_query": self.sound_query.to_dict() if self.sound_query else None,
+            "requested_top_k": self.requested_top_k,
+            "constraints": self.constraints.to_dict() if self.constraints else None,
             "model_id": self.model_id,
             "model_name": self.model_name,
             "taste_map_model_id": self.taste_map_model_id,
@@ -314,6 +322,9 @@ def _run_identifier(
     feature_digest: str,
     behavior_snapshot_digest: str,
     taste_map_assignment_digest: str,
+    sound_query: SoundQuery | None = None,
+    top_k: int = 50,
+    constraints: RankingConstraints | None = None,
 ) -> str:
     record = {
         "candidate_digest": candidate_digest,
@@ -321,6 +332,9 @@ def _run_identifier(
         "behavior_snapshot_digest": behavior_snapshot_digest,
         "taste_map_assignment_digest": taste_map_assignment_digest,
         "seeds": dict(sorted(seeds.items())),
+        "sound_query": sound_query.to_dict() if sound_query else None,
+        "top_k": top_k,
+        "constraints": constraints.to_dict() if constraints else None,
         "profile_name": profile_name,
         "profile_version": profile_version,
         "model_id": model_id,
@@ -372,6 +386,8 @@ def rank_candidates(
     profile: AudioFeatureProfile | None = None,
     profile_name: str | None = None,
     seed_weights: Mapping[str, float] | None = None,
+    sound_query: SoundQuery | None = None,
+    constraints: RankingConstraints | None = None,
     model: LinearTasteModel | None = None,
     behavior_snapshots: Iterable[BehaviorSnapshot] = (),
     cluster_assignments: Iterable[TasteMapAssignment] = (),
@@ -382,20 +398,28 @@ def rank_candidates(
 
     active = config or RecommendationConfig()
     candidate_rows = tuple(candidates)
-    if not candidate_rows or top_k < 1:
+    if not candidate_rows or isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
         raise RecommendationError("Candidates and top_k must be non-empty and positive")
     candidate_ids = [candidate.track_id for candidate in candidate_rows]
     if len(candidate_ids) != len(set(candidate_ids)):
         raise RecommendationError("Candidates contain duplicate track IDs")
     observation_rows = tuple(observations)
+    filter_catalog = FeatureCatalog(observation_rows)
     if (profile is None) != (profile_name is None):
         raise RecommendationError("Audio profile and profile_name must be supplied together")
     if profile is None and observation_rows:
         raise RecommendationError("Feature observations require an audio profile")
     catalog = ProfiledFeatureCatalog(observation_rows, profile) if profile is not None else None
     seeds = dict(seed_weights or {})
-    if seeds and (profile is None or profile.embedding_input is None):
+    if (seeds or sound_query) and (profile is None or profile.embedding_input is None):
         raise RecommendationError("Seed similarity requires an embedding profile")
+    if sound_query is not None and (
+        profile is None
+        or profile.embedding_input is None
+        or profile.embedding_input.selector != sound_query.selector
+        or profile.embedding_input.dimensions != len(sound_query.vector)
+    ):
+        raise RecommendationError("Sound query does not match the selected embedding space")
     if (
         model is not None
         and (model.includes_descriptors or model.includes_embedding)
@@ -407,14 +431,16 @@ def rank_candidates(
     ):
         raise RecommendationError("Taste model and selected audio profile do not match")
     query_vector: tuple[float, ...] | None = None
-    if seeds:
-        seed_vectors = []
+    if seeds or sound_query:
+        seed_vectors: list[tuple[Sequence[float], float]] = []
         for track_id, weight in seeds.items():
             assert catalog is not None
             representation = catalog.get(track_id)
             if representation is None or representation.embedding is None:
                 raise RecommendationError(f"Seed track lacks the selected embedding: {track_id}")
             seed_vectors.append((representation.embedding, weight))
+        if sound_query:
+            seed_vectors.append((sound_query.vector, sound_query.weight))
         query_vector = weighted_query_embedding(seed_vectors)
     snapshots = tuple(behavior_snapshots)
     snapshot_by_track = {snapshot.track_id: snapshot for snapshot in snapshots}
@@ -494,6 +520,9 @@ def rank_candidates(
         feature_digest=feature_digest,
         behavior_snapshot_digest=behavior_snapshot_digest,
         taste_map_assignment_digest=taste_map_assignment_digest,
+        sound_query=sound_query,
+        top_k=top_k,
+        constraints=constraints,
     )
     scored: list[_ScoredCandidate] = []
     for candidate in candidate_rows:
@@ -557,6 +586,12 @@ def rank_candidates(
         if candidate.track_id in seeds:
             base_score = None
             exclusion_reason = "seed_track"
+        elif constraints is not None:
+            exclusion_reason = constraints.exclusion(
+                candidate.track_id, candidate.artist_name, filter_catalog
+            )
+            if exclusion_reason is not None:
+                base_score = None
         scored.append(
             _ScoredCandidate(
                 candidate=candidate,
@@ -689,6 +724,9 @@ def rank_candidates(
         output_count=len(selected),
         tier_counts={str(tier): count for tier, count in tier_counts.items()},
         seed_count=len(seeds),
+        sound_query=sound_query,
+        requested_top_k=top_k,
+        constraints=constraints,
         model_id=model.model_id if model is not None else None,
         model_name=model.model_name if model is not None else None,
         taste_map_model_id=taste_map_model_id,

@@ -305,6 +305,12 @@ def _parser() -> argparse.ArgumentParser:
         help="Weighted acoustic seed; repeat for multi-seed retrieval",
     )
     candidate_parser.add_argument("--model", type=Path, help="Optional selected_model.json")
+    candidate_parser.add_argument("--text-query", help="Sound description; requires local_clap")
+    candidate_parser.add_argument("--text-weight", type=float, default=1.0)
+    candidate_parser.add_argument("--filters", type=Path, help="Exact-provenance filter JSON")
+    candidate_parser.add_argument(
+        "--clap-model-dir", type=Path, default=Path("artifacts/models/clap")
+    )
     candidate_parser.add_argument(
         "--behavior-snapshots",
         type=Path,
@@ -413,6 +419,15 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Extract objective descriptors without running the embedding model",
     )
+    audio_parser.add_argument("--embedding-backend", choices=("discogs", "clap"), default="discogs")
+    audio_parser.add_argument("--clap-model-dir", type=Path, default=Path("artifacts/models/clap"))
+    audio_parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    audio_parser.add_argument("--batch-size", type=int, default=4)
+    audio_parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        help="Optional per-track checkpoints for resuming interrupted extraction",
+    )
     audio_parser.add_argument(
         "--feature-head-model-dir",
         type=Path,
@@ -455,6 +470,33 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Acknowledge the models' CC BY-NC-SA 4.0 license",
     )
+    clap_parser = subparsers.add_parser(
+        "download-clap-model", help="Download the pinned Apache-2.0 Hugging Face CLAP model."
+    )
+    clap_parser.add_argument("--output-dir", type=Path, default=Path("artifacts/models/clap"))
+    validation_parser = subparsers.add_parser(
+        "validate-audio", help="Measure gain/excerpt identity retrieval on permitted real audio."
+    )
+    validation_parser.add_argument("manifest", type=Path)
+    validation_parser.add_argument("--output-dir", type=Path, required=True)
+    validation_parser.add_argument(
+        "--embedding-backend", choices=("discogs", "clap"), default="clap"
+    )
+    validation_parser.add_argument(
+        "--clap-model-dir", type=Path, default=Path("artifacts/models/clap")
+    )
+    validation_parser.add_argument(
+        "--embedding-model",
+        type=Path,
+        default=Path("artifacts/models/discogs-effnet-bsdynamic-1.onnx"),
+    )
+    report_parser = subparsers.add_parser(
+        "build-report",
+        help="Create a private, interactive HTML recommendation and taste-map report.",
+    )
+    report_parser.add_argument("recommendation_dir", type=Path)
+    report_parser.add_argument("--output", type=Path, required=True)
+    report_parser.add_argument("--taste-map-assignments", type=Path)
     return parser
 
 
@@ -926,6 +968,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "rank-candidates":
         from myusic_engine.clustering import TasteMapError, read_taste_map_assignments
+        from myusic_engine.embeddings.clap import SELECTOR, ClapBackend
+        from myusic_engine.embeddings.pooling import EmbeddingExtractionError
         from myusic_engine.features import FeatureRecordError, read_feature_observations
         from myusic_engine.modeling import (
             ModelingConfigError,
@@ -944,6 +988,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             read_candidates,
             write_recommendations,
         )
+        from myusic_engine.ranking.constraints import load_ranking_constraints
+        from myusic_engine.ranking.query import SoundQuery
+        from myusic_engine.ranking.similarity import SimilarityError
 
         try:
             if args.profile is None and args.features:
@@ -975,12 +1022,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 for path in args.features
                 for observation in read_feature_observations(path)
             )
+            sound_query = None
+            if args.text_query is not None:
+                if (
+                    selected_profile is None
+                    or selected_profile.embedding_input is None
+                    or selected_profile.embedding_input.selector != SELECTOR
+                ):
+                    raise RecommendationError("--text-query requires the local_clap profile")
+                sound_query = SoundQuery(
+                    args.text_query,
+                    ClapBackend(args.clap_model_dir).encode_text(args.text_query),
+                    SELECTOR,
+                    args.text_weight,
+                )
             recommendation_result = rank_candidates(
                 read_candidates(args.candidates),
                 feature_observations,
                 profile=selected_profile,
                 profile_name=args.profile,
                 seed_weights=seeds,
+                sound_query=sound_query,
+                constraints=load_ranking_constraints(args.filters) if args.filters else None,
                 model=read_taste_model(args.model) if args.model is not None else None,
                 behavior_snapshots=(
                     read_behavior_snapshots(args.behavior_snapshots)
@@ -998,6 +1061,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             write_recommendations(recommendation_result, args.output_dir)
         except (
             CandidateInputError,
+            EmbeddingExtractionError,
+            SimilarityError,
             FeatureRecordError,
             ModelingConfigError,
             RecommendationError,
@@ -1087,6 +1152,59 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         print(f"Recorded {feedback.outcome} feedback event {feedback.feedback_id}.")
         return 0
+    if args.command == "build-report":
+        from myusic_engine.reporting import build_explorer_report
+
+        try:
+            path = build_explorer_report(
+                args.recommendation_dir, args.output, taste_map_path=args.taste_map_assignments
+            )
+        except (ValueError, OSError) as exc:
+            print(f"Report creation failed: {exc}", file=sys.stderr)
+            return 2
+        print(f"Open this local report in your browser: {path.resolve()}")
+        return 0
+    if args.command == "validate-audio":
+        from myusic_engine.audio import read_audio_manifest
+        from myusic_engine.embeddings import DiscogsEffnetOnnxBackend
+        from myusic_engine.embeddings.clap import ClapBackend
+        from myusic_engine.evaluation.audio_validation import validate_audio_embeddings
+
+        try:
+            validation_backend = (
+                ClapBackend(args.clap_model_dir)
+                if args.embedding_backend == "clap"
+                else DiscogsEffnetOnnxBackend(args.embedding_model)
+            )
+            report = validate_audio_embeddings(
+                read_audio_manifest(args.manifest),
+                validation_backend,
+                args.output_dir,
+                progress=lambda done, total: print(
+                    f"Validated {done}/{total} recordings", flush=True
+                ),
+            )
+        except (ValueError, OSError) as exc:
+            print(f"Audio validation failed: {exc}", file=sys.stderr)
+            return 2
+        print(
+            f"Wrote recording-identity validation for {report['tracks']} tracks "
+            f"to {args.output_dir}"
+        )
+        return 0
+    if args.command == "download-clap-model":
+        from myusic_engine.embeddings.clap import download_clap_model
+        from myusic_engine.embeddings.pooling import EmbeddingExtractionError
+
+        try:
+            path = download_clap_model(
+                args.output_dir, progress=lambda name: print(f"Downloading {name}", flush=True)
+            )
+        except (EmbeddingExtractionError, OSError) as exc:
+            print(f"CLAP download failed: {exc}", file=sys.stderr)
+            return 2
+        print(f"Verified CLAP model: {path}")
+        return 0
     if args.command == "download-embedding-model":
         from myusic_engine.embeddings import EmbeddingExtractionError, download_model
 
@@ -1135,7 +1253,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             LearnedFeatureError,
         )
         from myusic_engine.features.objective import AudioAnalysisError
-        from myusic_engine.features.pipeline import analyze_audio_assets
+        from myusic_engine.features.pipeline import AudioEmbeddingBackend, analyze_audio_assets
         from myusic_engine.features.records import FeatureRecordError, write_feature_observations
 
         try:
@@ -1144,22 +1262,49 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.feature_config
                 else ObjectiveFeatureConfig()
             )
-            backend = (
-                None if args.skip_embeddings else DiscogsEffnetOnnxBackend(args.embedding_model)
-            )
+            backend: AudioEmbeddingBackend | None = None
+            if args.feature_head_model_dir is not None and (
+                args.skip_embeddings or args.embedding_backend != "discogs"
+            ):
+                raise LearnedFeatureError("Learned feature heads require the Discogs backend")
+            if not args.skip_embeddings:
+                if args.embedding_backend == "clap":
+                    from myusic_engine.embeddings.clap import ClapBackend
+
+                    backend = ClapBackend(
+                        args.clap_model_dir, device=args.device, batch_size=args.batch_size
+                    )
+                else:
+                    backend = DiscogsEffnetOnnxBackend(args.embedding_model)
             feature_head_backend = (
                 DiscogsEffnetFeatureHeadBackend(args.feature_head_model_dir)
                 if args.feature_head_model_dir is not None
                 else None
             )
             assets = read_audio_manifest(args.manifest)
-            audio_result = analyze_audio_assets(
-                assets,
-                config=audio_config,
-                embedding_backend=backend,
-                feature_head_backend=feature_head_backend,
-                window_output_dir=args.window_output_dir,
-            )
+            if args.cache_dir:
+                from myusic_engine.features.jobs import analyze_audio_job
+
+                audio_result = analyze_audio_job(
+                    assets,
+                    config=audio_config,
+                    embedding_backend=backend,
+                    feature_head_backend=feature_head_backend,
+                    window_output_dir=args.window_output_dir,
+                    cache_dir=args.cache_dir,
+                    progress=lambda done, total, cached: print(
+                        f"Audio {done}/{total}: {'reused checkpoint' if cached else 'analyzed'}",
+                        flush=True,
+                    ),
+                )
+            else:
+                audio_result = analyze_audio_assets(
+                    assets,
+                    config=audio_config,
+                    embedding_backend=backend,
+                    feature_head_backend=feature_head_backend,
+                    window_output_dir=args.window_output_dir,
+                )
             write_feature_observations(audio_result.observations, args.output)
         except (
             AudioAnalysisError,
@@ -1177,7 +1322,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{len(audio_result.observations)} feature observations."
         )
         if backend is not None:
-            print(f"Aggregated {audio_result.embedding_windows} Discogs-EffNet windows.")
+            print(f"Aggregated {audio_result.embedding_windows} {args.embedding_backend} windows.")
         if feature_head_backend is not None:
             print(f"Emitted {audio_result.learned_scores} learned audio scores.")
         print(f"Wrote feature observations to {args.output}")
