@@ -13,6 +13,22 @@ been validated locally. No copyrighted Spotify audio is required to build or tes
 
 ## Current milestone
 
+The target workflow is Spotify history to audio-based personal recommendations without
+requiring an MP3 library. A new public-data importer matches Spotify IDs and corroborating
+metadata to published MAEST audio embeddings, then trains personal preference models on
+the existing chronological listening labels:
+
+```powershell
+python scripts/import_history_embeddings.py --download
+python -m myusic_engine train-taste-model data/processed/modeling/temporal_taste_samples.jsonl `
+  --features data/processed/audio/music4all-history/features.jsonl --profile music4all_maest `
+  --output-dir data/processed/models/music4all-maest-history
+```
+
+This path has run on real history. The initial audio model did not beat the matched behavior
+baseline; current new-release feature coverage remains unresolved. See
+[Spotify history to an audio taste model](docs/spotify-history-audio-model.md).
+
 September 2026 additions: a verified local Hugging Face CLAP backend, natural-language sound
 queries blended with weighted song seeds, hard feature/artist filters in candidate ranking,
 resumable per-track extraction, a real-audio invariance benchmark, and a standalone browser
@@ -33,8 +49,8 @@ python scripts/run_demo.py
 The first run downloads approximately 615 MB of model weights plus small public audio files.
 The demonstration includes a noncommercial Creative Commons sample; retained attribution and
 license files are in `data/private/open-demo/`. These examples validate the workflow and are
-not your personal taste model. Your Spotify history still needs matching permitted audio to
-evaluate an improvement from deep embeddings.
+not your personal taste model. The public MAEST route above provides a separate experiment
+on history tracks with matching published embeddings.
 
 For your existing recommendation run, create a private browser report:
 
@@ -71,7 +87,9 @@ ingestion report. Phase 2 now has an offline account-catalog resolver and an off
 MusicBrainz mapper; live-provider coverage and manual match validation remain. A private
 behavior-only chronological model run is complete, and a private descriptor-audio ablation has now
 run on real offline-covered history — behavior alone remains the selected model there too.
-Embedding ablations and the real taste map remain gated on lawful embedding coverage. Phase 3
+MAEST embedding ablations have now run on a smaller public-dataset-covered history cohort;
+the initial combined model did not improve on behavior. Broader coverage and the real taste map
+remain open. Phase 3
 has a tested foundation, but its exit criterion still requires quality evaluation on a permitted
 real music corpus. See
 [current project status](docs/project-status.md).

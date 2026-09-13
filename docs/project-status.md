@@ -3,6 +3,18 @@
 This status separates implemented code, private validation already completed, and evidence that
 still requires an approved external service or permitted real audio.
 
+September 13 update: the primary workflow is Spotify history to personal audio-based release
+recommendations without requiring an MP3 library. A pinned Music4All-Onion importer now joins
+published 768-dimensional MAEST embeddings by exact Spotify ID plus corroborating title, artist,
+and album. A private history run imported real audio embeddings and evaluated both embedding-only
+and combined models. The initial combined model lost to the matched behavior baseline on
+validation. Current Release Radar inputs and comparable new-release audio features remain open.
+See [Spotify history to an audio taste model](spotify-history-audio-model.md).
+
+Verification for the September 13 importer: 203 tests pass with 79.27% branch-aware coverage;
+Ruff, formatting, strict mypy, and wheel packaging pass. Private source tables and model
+artifacts remain ignored.
+
 September 11 update: local Hugging Face CLAP inference, weighted audio/text queries, candidate
 feature/artist filters, per-track extraction checkpoints, and an interactive standalone HTML
 explorer are implemented. A repeatable Creative Commons demonstration now exercises the path
@@ -24,7 +36,7 @@ page console errors or remote requests. The wheel contains the browser template 
 | 2 — identity resolution | Offline resolver plus cached public-provider and offline canonical-dump mappers implemented | Review-sample precision and resulting coverage for each mapper; the live route also needs the user's explicit per-run approval |
 | 3 — clean-room audio representation | Foundation implemented | Permitted real-music corpus, pairwise sanity set, and retrieval-quality evaluation |
 | 4 — taste map and similarity | Standardized K-Means/HDBSCAN/PCA and retrieval implemented | Real lawful vectors and human retrieval sanity set |
-| 5 — personal preference ranker | Behavior baselines validated privately; descriptor-audio lift measured on real offline-covered history (not yet significant); embedding ablations implemented but unrun | Lawful embedding coverage from real permitted audio, and broader/higher-fidelity descriptor coverage |
+| 5 — personal preference ranker | Behavior, descriptor, and MAEST embedding ablations run on real history; initial audio variants have not improved on matched behavior | Broader audio coverage, model evaluation, and comparable features for new releases |
 | 6 — candidate intake/output | Local/account-export playlist intake, explainable ranking, URI handoff, feedback, and guarded private-playlist publication implemented | Real candidate features and an explicitly authorized live OAuth smoke test |
 
 Phase 1 validation read every discovered Extended History shard, rejected no malformed records,
@@ -96,10 +108,9 @@ real low-level descriptors for roughly half of the exactly matched history. On t
 audio-covered cohort, the paired validation comparison did not find the behavior-plus-descriptor
 model reliably better than behavior alone — its confidence interval sat at or below zero — so
 selection kept the simpler behavior-only model on that cohort; the seven-field descriptor set used
-alone performed clearly worse than behavior. This is an honest result, not a defect: seven coarse
-interpretable fields are a thin representation next to the 1,280-dimensional embedding phase 3 is
-designed to add once real permitted audio is available, and the selection rule is built to prefer
-the simpler model exactly when a claimed lift is this uncertain.
+alone performed clearly worse than behavior. Seven coarse interpretable fields are a limited
+representation. The MAEST experiment described above now also tests a deep audio representation;
+neither experiment has established an improvement over its matched behavior baseline.
 
 The engine deliberately does not emit Spotify-named `danceability`, `energy`, `valence`,
 `acousticness`, `speechiness`, or `instrumentalness` values. Learned outputs use custom

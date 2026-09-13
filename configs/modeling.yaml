@@ -38,6 +38,16 @@ model:
   ranking_k: 20
 
 profiles:
+  music4all_maest:
+    profile_version: music4all_maest_profile_v1
+    minimum_confidence: 0.50
+    descriptor_inputs: []
+    embedding_input:
+      feature_name: maest_audio_embedding_v1
+      feature_source: music4all_onion
+      source_version: zenodo-15394646-maest-block7-l2-v1
+      dimensions: 768
+
   local_clap:
     profile_version: clap_profile_v1
     minimum_confidence: 0.50
